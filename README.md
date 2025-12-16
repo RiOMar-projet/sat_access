@@ -1,9 +1,3 @@
----
-editor_options: 
-  markdown: 
-    wrap: sentence
----
-
 # Overview
 
 The `sat_access.py` & `sat_access.R` scripts allow you to download a series NetCDF files for chl a and/or SPM from an FTP server and visualize one day of data on a map.
@@ -18,6 +12,11 @@ As you prefer.
 -   Downloads a range of NetCDF file from an FTP server
 -   Extracts and visualizes a specified date and variable as a map
 -   Available for both `Python` and `R`
+
+#  TO DO
+
+-   Add knowledge of which algorithms produce best results by region
+-   Allow function to automatically choose the best processing algorithm for the given request
 
 # Usage
 
