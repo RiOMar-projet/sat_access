@@ -87,6 +87,13 @@ def download_and_plot(dl_var, dl_dates, bbox, output_dir, plot_var, overwrite):
                 with open(file_name_full, 'rb') as source, open(file_name_full[:-4], 'wb') as dest:
                     dest.write(bz2.decompress(source.read()))
                 print(f"File extracted at: {file_name_full[:-4]}")
+                
+                try:
+                    os.remove(file_name_full)
+                    print(f"Fichier compressé supprimé : {file_name_full}")
+                except Exception as e:
+                    print(f"Impossible de supprimer le fichier compressé : {e}")
+                    
             except Exception as e:
                 print(f"Failed to download or extract {url_final}: {e}")
 
@@ -186,7 +193,7 @@ if __name__ == "__main__":
     if len(sys.argv) == 1:
         sys.argv += [
             "--variable", "SPM",
-            "--daterange", "1999-01-01", "2024-12-31",
+            "--daterange", "1999-01-01", "1999-01-02",
             "--outputdir", "C:/Users/rpollet/Downloads/output/",
             "--plot", "True",
             "--overwrite", "False",
@@ -197,7 +204,7 @@ if __name__ == "__main__":
     download_and_plot(args.variable, args.daterange, args.boundingbox, args.outputdir, args.plot, args.overwrite)
 
 
-###### ANIMATION ######
+# ###### ANIMATION ######
 ds = xr.open_dataset("C:/Users/rpollet/Downloads/output/SPM_DAILY_19990101_20241231.nc")
 nc_var_name = "analysed_spim"
 var = ds[nc_var_name].sel(lat=slice(41.5, 44), lon=slice(2.5, 7))
