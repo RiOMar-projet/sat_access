@@ -28,8 +28,12 @@ As you prefer.
 | `--daterange` | Date range for desired data in YYYY-MM-DD format | Yes | 2025-10-15 |
 | `--outputdir` | Local folder to save the NetCDF file | Yes | downloads |
 | `--overwrite` | Overwrite existing files; Default = False | No | True |
+| `--concatenate` | Whether or not to concatenate the downloaded data into a single file; Default = False | No | True |
 | `--plot` | Whether or not to plot the downloaded data; Default = False | No | True |
+| `--animate` | Whether or not to animated the downloaded data; Default = False | No | True |
 | `--boundingbox` | Bounding box as: lon_min lon_max lat_min lat_max | No | 4 6 42 44 |
+
+__NB:__ The `--concatenate` and `--animate` arguments are currently only available in the `Python` version.
 
 ## Example Usage
 
@@ -48,6 +52,12 @@ Download multiple SPM files and plot one:
 
 ``` bash
 python sat_access.py --variable spm --date 2025-10-15 2025-10-17 --outputdir . --plot True --boundingbox 4 6 42 44
+```
+
+Download multiple SPM files, concatenate them into a single file, and create an animation:
+
+``` bash
+python sat_access.py --variable spm --date 2025-10-01 2025-10-31 --outputdir . --concatenate True --animate True --boundingbox 4 6 42 44
 ```
 
 ### R
@@ -96,6 +106,7 @@ Rscript sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE
 
 -   Python: 3.x
 -   Packages:
+    -   netCDF4
     -   xarray
     -   matplotlib
     -   cartopy
@@ -293,3 +304,4 @@ No liability is assumed and no warranty is provided.
 # Support
 
 For questions or issues, please contact Robert Schlegel at: [robert.schlegel\@imev-mer.fr](mailto:robert.schlegel@imev-mer.fr){.email}
+

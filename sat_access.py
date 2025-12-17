@@ -5,13 +5,13 @@ import os
 import argparse
 import urllib.request
 import bz2
+import netCDF4
 import xarray as xr
 import matplotlib.pyplot as plt
 import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import pandas as pd
 import numpy as np
-import netCDF4
 # import imageio.v2 as imageio
 
 from datetime import datetime, timedelta
