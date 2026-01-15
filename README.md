@@ -67,7 +67,7 @@ python sat_access.py --variable spm --date 2025-10-01 2025-10-31 --outputdir . -
 Download a single chl a file and plot it:
 
 ``` bash
-./sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot = TRUE --boundingbox 4 6 42 44
+./sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE --boundingbox 4 6 42 44
 ```
 
 Download multiple SPM files but plot none:
