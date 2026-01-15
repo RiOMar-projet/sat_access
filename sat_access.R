@@ -128,7 +128,7 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
       # Unzip
       if(file.exists(file_name_full)){
         result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
-        if (result != 0) {
+        if(length(result) != 0){
           message("Failed to unzip the file: ", file_name_full)
         } else {
           message("File unzipped at: ", gsub(".bz2","",file_name_full))
