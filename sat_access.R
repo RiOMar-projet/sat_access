@@ -115,12 +115,26 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
       }
       
       # Download
-      curl::curl_download(url_final, destfile = file_name_full)
-      message(paste0("File downloaded at: ",file_name_full))
+      tryCatch({
+        curl::curl_download(url_final, destfile = file_name_full)
+        message(paste0("File downloaded at: ",file_name_full))
+      }, error = function(e) {
+        if(grepl("Server denied you to change to the given directory", e$message[1])){
+          e$message <- " not found on server."
+        }
+        message(paste0(file_name,e$message[1]))
+      })
       
       # Unzip
-      system(paste("bunzip2 -k -f", file_name_full))
-      message("File unzipped at: ", gsub(".bz2","",file_name_full))
+      if(file.exists(file_name_full)){
+        result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
+        if (result != 0) {
+          message("Failed to unzip the file: ", file_name_full)
+        } else {
+          message("File unzipped at: ", gsub(".bz2","",file_name_full))
+        }
+      }
+
     }
     
     # Move to the next day
@@ -133,6 +147,12 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
   if(!plot_var){
     message("Plotting skipped as per user request.")
   } else {
+    
+    if(!file.exists(nc_file)){
+      # warning()
+      return(message(paste0(nc_file," cannot be found, so the plot cannot be generated.")))
+    }
+    
     message("Plotting...")
     
     # User warning about date range
@@ -198,9 +218,9 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
 # uncomment the following chunk of code and add your desired values directly:
 # args <- list(
 #   variable = "SPM",
-#   daterange = c("2023-01-01", "2023-01-05"),
-#   outputdir = "path/to/output/dir",
-#   overwrite = TRUE,
+#   daterange = c("2025-06-01", "2025-06-05"),
+#   outputdir = "~/Downloads", # Change as desired/required
+#   overwrite = FALSE,
 #   plot = TRUE,
 #   boundingbox = c(-10, 10, 35, 45)
 # )
