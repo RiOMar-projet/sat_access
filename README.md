@@ -13,79 +13,6 @@ As you prefer.
 -   Extracts and visualizes a specified date and variable as a map
 -   Available for both `Python` and `R`
 
-#  TO DO
-
--   Add knowledge of which algorithms produce best results by region
--   Allow function to automatically choose the best processing algorithm for the given request
-
-# Usage
-
-## Command-Line Arguments
-
-| Argument | Description | Required | Example Value |
-|------------------|------------------|------------------|------------------|
-| `--variable` | The data layer to download | Yes | SPM |
-| `--daterange` | Date range for desired data in YYYY-MM-DD format | Yes | 2025-10-15 |
-| `--outputdir` | Local folder to save the NetCDF file | Yes | downloads |
-| `--overwrite` | Overwrite existing files; Default = False | No | True |
-| `--concatenate` | Whether or not to concatenate the downloaded data into a single file; Default = False | No | True |
-| `--plot` | Whether or not to plot the downloaded data; Default = False | No | True |
-| `--animate` | Whether or not to animated the downloaded data; Default = False | No | True |
-| `--boundingbox` | Bounding box as: lon_min lon_max lat_min lat_max | No | 4 6 42 44 |
-
-__NB:__ The `--concatenate` and `--animate` arguments are currently only available in the `Python` version.
-
-## Example Usage
-
-The following examples assume the user is in a terminal at the same location as the script.
-Note that the argument `--outputdir .` specifies the current directory as the output folder.
-
-### Python
-
-Download a single chl a file:
-
-``` bash
-python sat_access.py --variable chla --date 2025-10-15 --outputdir .
-```
-
-Download multiple SPM files and plot one:
-
-``` bash
-python sat_access.py --variable spm --date 2025-10-15 2025-10-17 --outputdir . --plot True --boundingbox 4 6 42 44
-```
-
-Download multiple SPM files, concatenate them into a single file, and create an animation:
-
-``` bash
-python sat_access.py --variable spm --date 2025-10-01 2025-10-31 --outputdir . --concatenate True --animate True --boundingbox 4 6 42 44
-```
-
-### R
-
-#### Linux/MacOS
-
-Download a single chl a file and plot it:
-
-``` bash
-./sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE --boundingbox 4 6 42 44
-```
-
-Download multiple SPM files but plot none:
-
-``` bash
-./sat_access.R --variable spm --date 2025-11-15 2025-11-17 --outputdir . --plot FALSE
-```
-
-**NB:** The `./` before `sat_access.R` is necessary for bash to understand that this R script is meant to be run as an executable.
-
-#### Windows
-
-Download a single chl a file and plot it:
-
-``` powershell
-Rscript sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE --boundingbox 4 6 42 44
-```
-
 # How It Works
 
 1.  FTP Download:
@@ -174,6 +101,74 @@ Finally, make the script executable (run from the same location as the script):
 
 ``` bash
 chmod +x sat_access.R
+```
+
+# Usage
+
+## Command-Line Arguments
+
+| Argument | Description | Required | Example Value |
+|------------------|------------------|------------------|------------------|
+| `--variable` | The data layer to download | Yes | SPM |
+| `--daterange` | Date range for desired data in YYYY-MM-DD format | Yes | 2025-10-15 |
+| `--outputdir` | Local folder to save the NetCDF file | Yes | downloads |
+| `--overwrite` | Overwrite existing files; Default = False | No | True |
+| `--concatenate` | Whether or not to concatenate the downloaded data into a single file; Default = False | No | True |
+| `--plot` | Whether or not to plot the downloaded data; Default = False | No | True |
+| `--animate` | Whether or not to animated the downloaded data; Default = False | No | True |
+| `--boundingbox` | Bounding box as: lon_min lon_max lat_min lat_max | No | 4 6 42 44 |
+
+__NB:__ The `--concatenate` and `--animate` arguments are currently only available in the `Python` version.
+
+## Example Usage
+
+The following examples assume the user is in a terminal at the same location as the script.
+Note that the argument `--outputdir .` specifies the current directory as the output folder.
+
+### Python
+
+Download a single chl a file:
+
+``` bash
+python sat_access.py --variable chla --date 2025-10-15 --outputdir .
+```
+
+Download multiple SPM files and plot one:
+
+``` bash
+python sat_access.py --variable spm --date 2025-10-15 2025-10-17 --outputdir . --plot True --boundingbox 4 6 42 44
+```
+
+Download multiple SPM files, concatenate them into a single file, and create an animation:
+
+``` bash
+python sat_access.py --variable spm --date 2025-10-01 2025-10-31 --outputdir . --concatenate True --animate True --boundingbox 4 6 42 44
+```
+
+### R
+
+#### Linux/MacOS
+
+Download a single chl a file and plot it:
+
+``` bash
+./sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE --boundingbox 4 6 42 44
+```
+
+Download multiple SPM files but plot none:
+
+``` bash
+./sat_access.R --variable spm --date 2025-11-15 2025-11-17 --outputdir . --plot FALSE
+```
+
+**NB:** The `./` before `sat_access.R` is necessary for bash to understand that this R script is meant to be run as an executable.
+
+#### Windows
+
+Download a single chl a file and plot it:
+
+``` powershell
+Rscript sat_access.R --variable chla --date 2025-09-15 --outputdir . --plot TRUE --boundingbox 4 6 42 44
 ```
 
 # Troubleshooting
@@ -295,6 +290,11 @@ To address this issue open the `sat_access.R` script in your IDE of choice (e.g.
 ```         
 options(python_cmd = "C:/Path/To/Your/Python/python.exe")
 ```
+
+#  TO DO
+
+-   Add knowledge of which algorithms produce best results by region
+-   Allow function to automatically choose the best processing algorithm for the given request
 
 # License
 
