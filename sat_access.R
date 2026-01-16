@@ -132,11 +132,16 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
           message("Failed to unzip the file: ", file_name_full)
         } else {
           message("File unzipped at: ", gsub(".bz2","",file_name_full))
+          tryCatch({
+              file.remove(file_name_full)
+              message(paste("File removed :", file_name_full))
+            }, error = function(e) {
+              message(paste("Impossible to remove file :", e$message))
+            })
         }
       }
-
     }
-    
+
     # Move to the next day
     current_date <- current_date + 1
   }
@@ -218,7 +223,7 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
 # uncomment the following chunk of code and add your desired values directly:
 # args <- list(
 #   variable = "SPM",
-#   daterange = c("2025-06-01", "2025-06-05"),
+#   daterange = c("2025-09-01", "2025-09-05"),
 #   outputdir = "~/Downloads", # Change as desired/required
 #   overwrite = FALSE,
 #   plot = TRUE,
