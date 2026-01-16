@@ -3,8 +3,9 @@
 # Title: Satellite Data Access and Visualization Script
 # Author: Robert Schlegel
 # Date: January 2026
-# Description: This script downloads SPM or chlorophyll-a NetCDF files from a specified URL
-#              for given date ranges and plots the data.
+# Description: This script contains functions that can be used to
+#              download SPM or chlorophyll-a NetCDF files from a specified URL
+#              for given date ranges and plot the data.
 
 
 # Libraries ---------------------------------------------------------------
