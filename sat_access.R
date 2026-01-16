@@ -1,5 +1,11 @@
 #!/usr/bin/env Rscript
 
+# Title: Satellite Data Access and Visualization Script
+# Author: Robert Schlegel
+# Date: January 2026
+# Description: This script downloads SPM or chlorophyll-a NetCDF files from a specified URL
+#              for given date ranges and plots the data.
+
 
 # Libraries ---------------------------------------------------------------
 
@@ -103,9 +109,9 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
     file_name_full <- file.path(output_dir, file_name)
     
     # Fetch file
-    if(file.exists(file_name_full) & !overwrite){
+    if(file.exists(nc_file) & !overwrite){
       
-      message(paste0(file_name_full," already exists. Set --overwrite TRUE to force the download."))
+      message(paste0(nc_file," already exists. Set --overwrite TRUE to force the download."))
       
     } else {
       
@@ -154,7 +160,6 @@ download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var,
   } else {
     
     if(!file.exists(nc_file)){
-      # warning()
       return(message(paste0(nc_file," cannot be found, so the plot cannot be generated.")))
     }
     

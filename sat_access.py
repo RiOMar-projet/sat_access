@@ -1,6 +1,13 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 
+"""
+# Authors: Robert Schlegel, Romane Pollet
+# Date: January 2026
+# Description: This script downloads SPM or chlorophyll-a NetCDF files from a specified URL
+#              for given date ranges, optionally concatenates them, and plots or animates the data.
+"""
+
 import os
 import argparse
 import urllib.request
@@ -12,7 +19,6 @@ import cartopy.crs as ccrs
 import cartopy.feature as cfeature
 import pandas as pd
 import numpy as np
-# import imageio.v2 as imageio
 
 from datetime import datetime, timedelta
 from matplotlib.animation import FuncAnimation, PillowWriter
