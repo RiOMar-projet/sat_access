@@ -2,15 +2,18 @@
 
 The `sat_access.py` & `sat_access.R` scripts allow you to download a series NetCDF files for chl a and/or SPM from an FTP server and visualize one day of data on a map.
 They are designed specifically to work for the suite of ODATIS products put into production for/during the RiOMar project.
-Note that while these scripts have been written so that they can be called from the command line, they can also be opened in your IDE of choice (e.g. `VS Code`, `RStudio`, etc.) and the parameters set directly in the code.
-As you prefer.
+Note that while these scripts have been written so that they can be called from the command line, 
+they can also be opened in your IDE of choice (e.g. `VS Code`, `RStudio`, etc.) and the parameters set directly in the code.
+Indeed, command line based operations for the `R` language have proven to be more complicated than it may be worth. So a third script,
+`sat_access_script.R` has been created which is designed to run like a 'traditional' `R` script.
+Meaning it can be downloaded from this repository, and then opened from an IDE (e.g. `RStudio`) and the functions can be run from there.
 
 # Features
 
 -   No installation required, simply download a script and call it from the command-line
 -   Uses **`argparse`** for easy command-line argument handling
 -   Downloads a range of NetCDF file from an FTP server
--   Extracts and visualizes a specified date and variable as a map
+-   Extracts and visualizes specified dates, bounding boxes, and variables as a map
 -   Available for both `Python` and `R`
 
 # How It Works
@@ -21,7 +24,7 @@ As you prefer.
 
 2.  Visualisation:
 
--   It loads the NetCDF file and clips the data to the specified bounding box the longitude, latitude, and the specified variable before plotting it as a map using **`matplotlib`** (`Python`) or **`ggplot2`** (`R`).
+-   It loads the NetCDF file and clips the data to the specified longitude, latitude, and the chosen variable before plotting it as a map using **`matplotlib`** (`Python`) or **`ggplot2`** (`R`).
 
 3.  Saving plots:
 
@@ -67,11 +70,13 @@ You will know it is working if you see activity in the console as it downloads t
 
 -   R: 4.x
 -   Packages:
-    -   argparse
+    -   argparse (for `sat_access.R` _not_ `sat_access_script.R`)
     -   ncdf4
     -   curl
-    -   ggplot2
     -   reshape2
+    -   ggplot2
+
+**NB:** The following requirements are only for `sat_access.R`, these requirements can be avoided if one chooses to use `sat_access_script.R` instead.
 
 To check if you have R installed, open a terminal and type:
 
@@ -146,6 +151,8 @@ python sat_access.py --variable spm --date 2025-10-01 2025-10-31 --outputdir . -
 ```
 
 ### R
+
+**NB:** The following command line examples only work for `sat_access.R`, not `sat_access_script.R`.
 
 #### Linux/MacOS
 
@@ -234,6 +241,10 @@ pip install --upgrade xarray netCDF4
 ```
 
 ### R
+
+**NB:** If you are encountering issues trying to get `sat_access.R` to work, it is strongly advised to use `sat_access_script.R` instead.
+This is because there can be a very long list of potential issues getting the command line functionality to work with `R`. 
+Particularly on computers running a Windows based operating systems.
 
 #### Error: R not found
 
