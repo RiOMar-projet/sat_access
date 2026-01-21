@@ -25,16 +25,6 @@ library(ggplot2)  # For visualization
 
 # The download function ---------------------------------------------------
 
-# testing...
-# dl_var = "CDOM"
-# dl_dates = c("2022-09-01", "2022-09-05")
-# dl_product = "ODATIS-MR"
-# dl_sensor = "OLCI-A"
-# dl_correction = "polymer"
-# dl_time_step = "day"
-# output_dir = "~/Downloads"
-# overwrite = FALSE 
-
 download_nc <- function(dl_var, dl_dates, 
                         dl_product = NULL, dl_sensor = NULL, 
                         dl_correction = NULL, dl_time_step = NULL,
@@ -392,6 +382,9 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
 # Examples ----------------------------------------------------------------
 
 ## Downloading ------------------------------------------------------------
+
+# download_nc() will attempt to pick the correct sensors etc based on the requested variable and dates
+# Possible variables: SPM, CHLA, CDOM, RRS, TUR, SST
 
 # Download a few days of SPM data
 download_nc(
