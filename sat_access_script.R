@@ -12,7 +12,7 @@
 
 # Check for missing libraries and install them if necessary
 if (!all(c("ncdf4", "curl", "reshape2", "ggplot2") %in% installed.packages())) {
-  install.packages(c("ncdf4", "curl", "reshape2", "ggplot2"), repos = "https://cloud.r-project.org/")
+  install.packages(c("ncdf4", "curl", "lubridate", "reshape2", "ggplot2"), repos = "https://cloud.r-project.org/")
 }
 
 # Activate libraries
@@ -26,14 +26,14 @@ library(ggplot2)  # For visualization
 # The download function ---------------------------------------------------
 
 # testing...
-dl_var = "CDOM"
-dl_dates = c("2022-09-01", "2022-09-05")
-dl_product = "ODATIS-MR"
-dl_sensor = "OLCI-A"
-dl_correction = "polymer"
-dl_time_step = "day"
-output_dir = "~/Downloads"
-overwrite = FALSE 
+# dl_var = "CDOM"
+# dl_dates = c("2022-09-01", "2022-09-05")
+# dl_product = "ODATIS-MR"
+# dl_sensor = "OLCI-A"
+# dl_correction = "polymer"
+# dl_time_step = "day"
+# output_dir = "~/Downloads"
+# overwrite = FALSE 
 
 download_nc <- function(dl_var, dl_dates, 
                         dl_product = NULL, dl_sensor = NULL, 
@@ -86,25 +86,20 @@ download_nc <- function(dl_var, dl_dates,
       # Base URL
       url_base <- "ftp://ftp.ifremer.fr/ifremer/cersat/products/gridded/ocean-color/atlantic"
       
-      # Variable specifics
+      # Prep file stub string
       if(toupper(dl_var) %in% c("SPM", "SPIM")){
         url_product_stub <- "EUR-L4-SPIM-ATL-v01"
-        url_product <- paste0(url_product_stub,"/",url_year_doy)
-        file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
-        nc_file <- file.path(output_dir, paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc"))
-        # nc_var_name <- "analysed_spim"
-        # var_label <- "SPM [g m-3]"
       } else if(toupper(dl_var) %in% c("CHL", "CHLA")){
         url_product_stub <- "EUR-L4-CHL-ATL-v01"
-        url_product <- paste0(url_product_stub,"/",url_year_doy)
-        file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
-        nc_file <- file.path(output_dir, paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc"))
-        # nc_var_name <- "analysed_chl_a"
-        # var_label <- "chl a [mg m-3]"
       } else {
         stop("Variable not available")
       }
       
+      # Variable specifics
+      url_product <- paste0(url_product_stub,"/",url_year_doy)
+      file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
+      nc_file <- file.path(output_dir, paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc"))
+
     # Get URL specifics for ODATIS-MR
     } else if(toupper(dl_product) == "ODATIS-MR"){
       
@@ -130,7 +125,7 @@ download_nc <- function(dl_var, dl_dates,
       if(dl_correction == "polymer"){
         dl_correction_chunk <- "PO"
       } else if(dl_correction == "nirswir"){
-        dl_sensor_chunk <- "NS"
+        dl_correction_chunk <- "NS"
       } else {
         stop("Please check the value given for 'dl_correction'")
       }
@@ -172,25 +167,14 @@ download_nc <- function(dl_var, dl_dates,
       
       # Product URL
       url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
+      file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
+      nc_file <- file.path(output_dir, file_name)
       
-      # Get variable specifics
-      if(toupper(dl_var) %in% c("CDOM")){
-        file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
-        # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
-        # "polymer/olcia/day/2016/12/01/L3m_20161201__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
-        # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
-        # "polymer/olcib/day/2022/09/01/L3m_20220901__FRANCE_03_OLB_CDOM-PO_DAY_00.nc"
-        # "nirswir/modis/day/2002/07/04/L3m_20020704__FRANCE_03_MOD_CDOM-NS_DAY_00.nc"
-      } else {
-        stop("Variable not available")
-      }
     } else {
       stop("Please check the value used for 'dl_product'")
     }
 
     # Assemble final URL
-    # url_final_ <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE/polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
-    # url_final <- "http://tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE/polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
     url_final <- paste(url_base, url_product, file_name, sep = "/")
     file_name_full <- file.path(output_dir, file_name)
     
@@ -237,10 +221,11 @@ download_nc <- function(dl_var, dl_dates,
     }
     
     # Move to the next day
+    # TODO: Change this to match the requested time-step
     current_date <- current_date + 1
   }
 }
-
+#
 
 # The plotting function ---------------------------------------------------
 
@@ -319,6 +304,8 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
 
 # Examples ----------------------------------------------------------------
 
+## Downloading ------------------------------------------------------------
+
 # Download a few days of SPM data
 download_nc(
   dl_var = "SPM",
@@ -334,6 +321,33 @@ download_nc(
   output_dir = "~/Downloads", # Change as desired/required
   overwrite = FALSE # Change to TRUE to force downloads
 )
+
+# Download a few days day of CDOM data
+download_nc(
+  dl_var = "CDOM",
+  dl_dates = c("2022-09-01", "2022-09-05"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "OLCI-A",
+  dl_correction = "polymer",
+  dl_time_step = "day",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
+# Download one day day of SST data
+download_nc(
+  dl_var = "SST",
+  dl_dates = "2014-01-01",
+  dl_product = "ODATIS-MR",
+  dl_sensor = "MODIS",
+  dl_correction = "nirswir",
+  dl_time_step = "day",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
+
+## Plotting ---------------------------------------------------------------
 
 # Plot an SPM NetCDF file
 plot_nc(
