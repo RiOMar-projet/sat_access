@@ -24,7 +24,20 @@ library(ggplot2)  # For visualization
 
 # The download function ---------------------------------------------------
 
-download_nc <- function(dl_var, dl_dates, output_dir, overwrite) {
+
+dl_var = "CDOM"
+dl_dates = c("2022-09-01", "2022-09-05")
+dl_product = "ODATIS-MR"
+dl_sensor = "OLCI-A"
+dl_correction = "polymer"
+dl_time_step = "day"
+output_dir = "~/Downloads"
+overwrite = FALSE 
+
+download_nc <- function(dl_var, dl_dates, 
+                        dl_product = NULL, dl_sensor = NULL, 
+                        dl_correction = NULL, dl_time_step = NULL,
+                        output_dir, overwrite) {
   
   # Check date range
   if(length(dl_dates) > 2){
@@ -39,6 +52,20 @@ download_nc <- function(dl_var, dl_dates, output_dir, overwrite) {
     end_date <- start_date
   }
   
+  # Check that a valid product, sensor, correction combo has been chosen
+  # TODO: Expand this logic to catch any issues before the while loop begins
+  # if(!toupper(dl_product) %in% c("SEXTANT", "ODATIS-MR")){
+    # stop("Plesae set 'dl_product' to either 'SEXTANT' or 'ODATIS-MR'")
+  # } #else if(toupper(dl_sensor) == "ODATIS-MR"){
+    # if(!dl_sensor %in% c("MODIS", "MERIS", "OLCI-A", "OLCI-B"))
+  # }
+  
+  # TODO: Add a logic gate that will chose the best product, sensor, and correction based on the variable and download dates chosen
+  # It must create messages for the user letting them know what has been chosen
+  # This could also be made to favour higher resolution data
+  # The messages could briefly explain why the choice was made
+  # This would address the TODO item of choosing the 'best' chl-a etc. data given the bbox etc.
+  
   # Iterate over each date in the range
   current_date <- start_date
   while(current_date <= end_date){
@@ -46,34 +73,88 @@ download_nc <- function(dl_var, dl_dates, output_dir, overwrite) {
     # Prep date strings
     dl_date <- current_date
     dl_date_flat <- gsub("-", "", dl_date)
+    dl_year <- substr(dl_date, start = 1, stop = 4)
+    dl_month <- substr(dl_date, start = 6, stop = 7)
+    dl_day <- substr(dl_date, start = 9, stop = 10)
     url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
     
-    # Get general URL based on desired variables
-    if(toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")){
+    # Get URL specifics
+    if(toupper(dl_product) == "SEXTANT"){
+      
+      # Base URL
       url_base <- "ftp://ftp.ifremer.fr/ifremer/cersat/products/gridded/ocean-color/atlantic"
+      
+      # Variable specifics
+      if(toupper(dl_var) %in% c("SPM", "SPIM")){
+        url_product_stub <- "EUR-L4-SPIM-ATL-v01"
+        url_product <- paste0(url_product_stub,"/",url_year_doy)
+        file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
+        nc_file <- file.path(output_dir, paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc"))
+        # nc_var_name <- "analysed_spim"
+        # var_label <- "SPM [g m-3]"
+      } else if(toupper(dl_var) %in% c("CHL", "CHLA")){
+        url_product_stub <- "EUR-L4-CHL-ATL-v01"
+        url_product <- paste0(url_product_stub,"/",url_year_doy)
+        file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
+        nc_file <- file.path(output_dir, paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc"))
+        # nc_var_name <- "analysed_chl_a"
+        # var_label <- "chl a [mg m-3]"
+      } else {
+        stop("Variable not available")
+      }
+      
+    } else if(toupper(dl_product) == "ODATIS-MR"){
+      
+      # Base URL
+      url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+      # url_base <- "https://tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+      
+      # Prep sensor stirngs
+      dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
+      if(dl_sensor == "OLCI-A"){
+        dl_sensor_chunk <- "OLA"
+      } else if(dl_sensor == "OLCI-B"){
+        dl_sensor_chunk <- "OLB"
+      } else if(dl_sensor == "MERIS"){
+        dl_sensor_chunk <- "MER"
+      } else if(dl_sensor == "MODIS"){
+        dl_sensor_chunk <- "MOD"
+      } else {
+        stop("Please check the value given for 'dl_sensor'")
+      }
+      
+      # Prep correction strings
+      dl_correction_flat <- tolower(gsub("-", "", dl_correction))
+      if(dl_correction == "polymer"){
+        dl_correction_chunk <- "PO"
+      } else if(dl_correction == "nirswir"){
+        dl_sensor_chunk <- "NS"
+      } else {
+        stop("Please check the value given for 'dl_correction'")
+      }
+      
+      # Product URL
+      url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
+      
+      # Get variable specifics
+      if(toupper(dl_var) %in% c("CDOM")){
+        file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
+        # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
+        # "polymer/olcia/day/2016/12/01/L3m_20161201__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
+        # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
+        # "polymer/olcib/day/2022/09/01/L3m_20220901__FRANCE_03_OLB_CDOM-PO_DAY_00.nc"
+        # "nirswir/modis/day/2002/07/04/L3m_20020704__FRANCE_03_MOD_CDOM-NS_DAY_00.nc"
+      } else {
+        stop("Variable not available")
+      }
     } else {
-      stop("Variable not yet available")
+      stop("Please check the value used for 'dl_product'")
     }
-    
-    # Get product specifics
-    if(toupper(dl_var) %in% c("SPM", "SPIM")){
-      file_name <- paste0(dl_date_flat,"-EUR-L4-SPIM-ATL-v01-fv01-OI.nc.bz2")
-      url_product <- "EUR-L4-SPIM-ATL-v01"
-      nc_file <- file.path(output_dir, paste0(dl_date_flat,"-EUR-L4-SPIM-ATL-v01-fv01-OI.nc"))
-      nc_var_name <- "analysed_spim"
-      var_label <- "SPM [g m-3]"
-    } else if(toupper(dl_var) %in% c("CHL", "CHLA")){
-      file_name <- paste0(dl_date_flat,"-EUR-L4-CHL-ATL-v01-fv01-OI.nc.bz2")
-      url_product <- "EUR-L4-CHL-ATL-v01"
-      nc_file <- file.path(output_dir, paste0(dl_date_flat,"-EUR-L4-CHL-ATL-v01-fv01-OI.nc"))
-      nc_var_name <- "analysed_chl_a"
-      var_label <- "chl a [mg m-3]"
-    } else {
-      stop("Variable not yet available")
-    }
-    
+
     # Assemble final URL
-    url_final <- paste(url_base, url_product, url_year_doy, file_name, sep = "/")
+    # url_final_ <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE/polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
+    # url_final <- "http://tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE/polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
+    url_final <- paste(url_base, url_product, file_name, sep = "/")
     file_name_full <- file.path(output_dir, file_name)
     
     # Fetch file
@@ -99,19 +180,21 @@ download_nc <- function(dl_var, dl_dates, output_dir, overwrite) {
         message(paste0(file_name,e$message[1]))
       })
       
-      # Unzip
+      # Unzip if necessary
       if(file.exists(file_name_full)){
-        result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
-        if(length(result) != 0){
-          message("Failed to unzip the file: ", file_name_full)
-        } else {
-          message("File unzipped at: ", gsub(".bz2","",file_name_full))
-          tryCatch({
-            file.remove(file_name_full)
-            message(paste("File removed :", file_name_full))
-          }, error = function(e) {
-            message(paste("Impossible to remove file :", e$message))
-          })
+        if(grepl("bz2", file_name_full)){
+          result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
+          if(length(result) != 0){
+            message("Failed to unzip the file: ", file_name_full)
+          } else {
+            message("File unzipped at: ", gsub(".bz2","",file_name_full))
+            tryCatch({
+              file.remove(file_name_full)
+              message(paste("File removed :", file_name_full))
+            }, error = function(e) {
+              message(paste("Impossible to remove file :", e$message))
+            })
+          }
         }
       }
     }
