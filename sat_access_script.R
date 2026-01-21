@@ -18,13 +18,14 @@ if (!all(c("ncdf4", "curl", "reshape2", "ggplot2") %in% installed.packages())) {
 # Activate libraries
 library(ncdf4)    # For reading NetCDF files
 suppressPackageStartupMessages(library(curl)) # For FTP download
+library(lubridate) # For working with dates
 library(reshape2) # For data reshaping
 library(ggplot2)  # For visualization
 
 
 # The download function ---------------------------------------------------
 
-
+# testing...
 dl_var = "CDOM"
 dl_dates = c("2022-09-01", "2022-09-05")
 dl_product = "ODATIS-MR"
@@ -67,6 +68,7 @@ download_nc <- function(dl_var, dl_dates,
   # This would address the TODO item of choosing the 'best' chl-a etc. data given the bbox etc.
   
   # Iterate over each date in the range
+  # TODO: This will need to be reowrked if the user is requesting 8-day or monthly data
   current_date <- start_date
   while(current_date <= end_date){
     
@@ -78,7 +80,7 @@ download_nc <- function(dl_var, dl_dates,
     dl_day <- substr(dl_date, start = 9, stop = 10)
     url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
     
-    # Get URL specifics
+    # Get URL specifics for SEXTANT
     if(toupper(dl_product) == "SEXTANT"){
       
       # Base URL
@@ -103,13 +105,13 @@ download_nc <- function(dl_var, dl_dates,
         stop("Variable not available")
       }
       
+    # Get URL specifics for ODATIS-MR
     } else if(toupper(dl_product) == "ODATIS-MR"){
       
       # Base URL
       url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
-      # url_base <- "https://tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
       
-      # Prep sensor stirngs
+      # Prep sensor strings
       dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
       if(dl_sensor == "OLCI-A"){
         dl_sensor_chunk <- "OLA"
@@ -133,12 +135,47 @@ download_nc <- function(dl_var, dl_dates,
         stop("Please check the value given for 'dl_correction'")
       }
       
+      # Prep time-step string
+      if(dl_time_step == "day"){
+        dl_time_step_chunk <- "DAY"
+      } else if(dl_time_step == "8-day"){
+        # TODO: Need to think about how to manage the 8 day jumps
+        # Would be ideal to be able to quickly access the HTML structure within the chosen years+months of data
+        dl_time_step_chunk <- "8D"
+      } else if(dl_time_step == "month"){
+        dl_time_step_chunk <- "MO"
+        dl_date_flat <- paste0(format(floor_date(ymd(dl_date), "month"), "%Y%m%d"), "-", format(ceiling_date(ymd(dl_date), "month") - days(1), "%Y%m%d"))
+      } else {
+        stop("Please check the value given for 'dl_time_step'")
+      }
+      
+      # Prep the variable string
+      if(dl_var %in% c("CDOM")){
+        dl_var_chunk <- dl_var
+      } else if(dl_var %in% c("CHL", "CHLA")){
+        dl_var_chunk <- "CHL-OC5"
+      } else if(dl_var %in% c("RRS", "NRRS")){
+        if(dl_sensor == "MODIS"){
+          dl_var_chunk <- "NRRS560"
+        } else {
+          dl_var_chunk <- "NRRS555"
+        }
+      } else if(dl_var %in% c("SPM", "SPIM")){
+        dl_var_chunk <- "SPM-G"
+      } else if(dl_var %in% c("T", "TUR")){
+        dl_var_chunk <- "T-FNU"
+      } else if(dl_var %in% c("SST")){
+        dl_var_chunk <- "SST-NIGHT"
+      } else {
+        stop("Please check the value given for 'dl_sensor'")
+      }
+      
       # Product URL
       url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
       
       # Get variable specifics
       if(toupper(dl_var) %in% c("CDOM")){
-        file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
+        file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
         # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
         # "polymer/olcia/day/2016/12/01/L3m_20161201__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
         # "polymer/olcia/day/2022/09/01/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc"
