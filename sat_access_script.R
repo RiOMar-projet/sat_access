@@ -45,30 +45,117 @@ download_nc <- function(dl_var, dl_dates,
     stop("Please provide only one or two dates for the date range.")
   }
   
-  # Set start and end dates for download
-  start_date <- as.Date(dl_dates[1])
-  if(length(dl_dates) == 2){
-    end_date <- as.Date(dl_dates[2])
-  } else{
-    end_date <- start_date
+  # Check requested time-step
+  if(is.null(dl_time_step)){
+    message("No time-step chosen, defaulting to daily data.")
+    dl_time_step <- "day"
+  } else if(dl_time_step %in% c("day", "daily")){
+    dl_time_step <- "day"
+  } else if(dl_time_step %in% c("month", "monthly")){
+    dl_time_step <- "month"
+  } else if(dl_time_step %in% c("8d", "8D", "8day", "8Day", "8-day", "8-daily", "weekly")){
+    dl_time_step <- "8-day"
+  } else {
+    stop("'dl_time_step value not recognised, please choose one of : 'day', '8-day', 'month'")
   }
   
-  # Check that a valid product, sensor, correction combo has been chosen
-  # TODO: Expand this logic to catch any issues before the while loop begins
-  # if(!toupper(dl_product) %in% c("SEXTANT", "ODATIS-MR")){
-    # stop("Plesae set 'dl_product' to either 'SEXTANT' or 'ODATIS-MR'")
-  # } #else if(toupper(dl_sensor) == "ODATIS-MR"){
-    # if(!dl_sensor %in% c("MODIS", "MERIS", "OLCI-A", "OLCI-B"))
-  # }
+  # Set start and end dates for download
+  # TODO: Correct this based on the time-step
+  # Need special setup for 8-day and monthly requests
+  if(dl_time_step == "day"){
+    start_date <- as.Date(dl_dates[1])
+    if(length(dl_dates) == 2){
+      end_date <- as.Date(dl_dates[2])
+    } else{
+      end_date <- start_date
+    }
+  } else if(dl_time_step == "8-day"){
+    stop("8-day time-steps not yet implemented")
+  } else if(dl_time_step == "month"){
+    stop("month time-steps not yet implemented")
+  } else {
+    stop("'dl_time_step value not recognised, please choose one of : 'day', '8-day', 'month'")
+  }
   
-  # TODO: Add a logic gate that will chose the best product, sensor, and correction based on the variable and download dates chosen
+  # Check chosen variable against chosen data product
+  if(is.null(dl_product)){
+    if(toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")){
+      message("No data product chosen, defaulting to 'SEXTANT' for SPM and Chl a data.")
+      dl_product <- "SEXTANT"
+    } else if(toupper(dl_var) %in% c("CDOM", "RRS", "NRRS", "T", "TUR", "SST")){
+      message("No data product chosen, defaulting 'ODATIS-MR'.")
+      dl_product <- "ODATIS-MR"
+    } else {
+      stop("Variable not available, please check the value given for 'dl_var'")
+    }
+  }
+  
+  # Get sensors and corrections for ODATIS-MR data products
+  if(dl_product == "ODATIS-MR"){
+    
+    # Check chosen sensor against data product
+    if(is.null(dl_sensor)){
+      if(dl_var == "SST"){
+        message("No sensor chosen, defaulting to 'MODIS' because 'dl_var = SST'.")
+        dl_sensor <- "MODIS"
+      } else {
+        message("No sensor chosen, defaulting to 'OLCI-A'.")
+        dl_sensor <- "OLCI-A"
+      }
+    } else if(!dl_sensor %in% c("MODIS", "MERIS", "OLCI-A", "OLCI-B")){
+      stop("Please set 'dl_sensor' to either 'MODIS', 'MERIS', 'OLCI-A', or 'OLCI-B'")
+    }
+    
+    # Check chosen correction against data product
+    if(is.null(dl_correction)){
+      if(dl_sensor == "MODIS"){
+        message("No atmospheric correction chosen, defaulting to 'nirswir' to match 'dl_sensor = MODIS'.")
+        dl_correction <- "nirswir"
+      } else if(dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B")){
+        message(paste0("No atmospheric correction chosen, defaulting to 'polymer' to match 'dl_sensor = ",dl_sensor,"'.."))
+        dl_correction <- "polymer"
+      }
+    } else if(!dl_correction %in% c("polymer", "nirswir")){
+      stop("Please set 'dl_correction' to either 'polymer' or 'nirswir'")
+    }
+  }
+  
+  # Check chosen dates against chosen data product, sensor, and correction
+  # TODO: This could be optimized
+  if(toupper(dl_product) == "SEXTANT"){
+    if(start_date < as.Date("1998-01-01") | end_date > as.Date(Sys.Date())-7){
+      stop("SEXTANT data are only available from 1998-01-01 to roughly 1 week before the present date. Please adjust your date range accordingly.")
+    }
+  } else if(dl_product == "ODATIS-MR"){
+    if(dl_sensor == "MODIS"){
+      # TODO: Increase data ranges when the data are uploaded through to 2026
+      if(start_date < as.Date("2002-07-04") | end_date > as.Date("2023-12-31")){
+        stop(paste0("ODATIS-MR MODIS data are only available from 2002-07-04 to 2023-12-31. Please adjust your date range accordingly."))
+      }
+    } else if(dl_sensor == "MERIS"){
+      if(start_date < as.Date("2002-06-19") | end_date > as.Date("2012-04-08")){
+        stop(paste0("ODATIS-MR MERIS data are only available from 2013-07-01 to . Please adjust your date range accordingly."))
+      }
+    } else if(dl_sensor == "OLCI-A"){
+      if(start_date < as.Date("2016-04-26") | end_date > as.Date("2023-12-31")){
+        stop(paste0("ODATIS-MR OLCI-A data are only available from 2016-04-26 to 2023-12-31. Please adjust your date range accordingly."))
+      }
+    } else if(dl_sensor == "OLCI-B"){
+      if(start_date < as.Date("2018-05-15") | end_date > as.Date("2023-12-31")){
+        stop(paste0("ODATIS-MR OLCI-B data area only available from 2018-05-15 to 2023-12-31. Please adjust your date range accordingly."))
+      }
+    }
+  }
+  
+  # TODO: 
+  # Create a more intelligent logic gate that chooses the best product, sensor, and correction based on the variable and download dates chosen
   # It must create messages for the user letting them know what has been chosen
   # This could also be made to favour higher resolution data
   # The messages could briefly explain why the choice was made
   # This would address the TODO item of choosing the 'best' chl-a etc. data given the bbox etc.
   
   # Iterate over each date in the range
-  # TODO: This will need to be reowrked if the user is requesting 8-day or monthly data
+  # TODO: This will need to be reworked if the user is requesting 8-day or monthly data
   current_date <- start_date
   while(current_date <= end_date){
     
@@ -326,10 +413,6 @@ download_nc(
 download_nc(
   dl_var = "CDOM",
   dl_dates = c("2022-09-01", "2022-09-05"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "OLCI-A",
-  dl_correction = "polymer",
-  dl_time_step = "day",
   output_dir = "~/Downloads",
   overwrite = FALSE
 )
@@ -338,10 +421,6 @@ download_nc(
 download_nc(
   dl_var = "SST",
   dl_dates = "2014-01-01",
-  dl_product = "ODATIS-MR",
-  dl_sensor = "MODIS",
-  dl_correction = "nirswir",
-  dl_time_step = "day",
   output_dir = "~/Downloads",
   overwrite = FALSE
 )
