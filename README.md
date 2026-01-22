@@ -307,20 +307,20 @@ options(python_cmd = "C:/Path/To/Your/Python/python.exe")
 
 -   Add knowledge of which algorithms produce best results by region
 -   Allow function to automatically choose the best processing algorithm for the given request
--   Add `ODATIS-MR` downloading functionality for 8-day and monthly data to all scripts
--   Add `ODATIS-MR` daily downloading functionality to `sat_access.py` and `sat_access.R`
+-   Add `ODATIS-MR` daily, 8-day, and monthly downloading functionality to `sat_access.py` and `sat_access.R`
 -   Add `ODATIS-MR` plotting functionality to `sat_access.py` and `sat_access.R`
 
 # Updates
 
 ## 2026-01-22
 
--   Added the ability to plot all of the daily data files that can be downloaded via `sat_access_script.R`.
+-   Added the ability to download all of the 8-day and monthly products within `ODATIS-MR` via `sat_access_script.R`.
+-   Added the ability to plot all of the daily, 8-day, and monthly data files that can be downloaded via `sat_access_script.R`.
 -   Created the __Updates__ section and populated it with the history of the project to date.
 
 ## 2026-01-21
 
--   Added the ability to download all of the different products within `ODATIS-MR` to `sat_access_script.R`.
+-   Added the ability to download all of the daily products within `ODATIS-MR` via `sat_access_script.R`.
 
 ## 2025-01-19
 

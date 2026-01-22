@@ -50,25 +50,34 @@ download_nc <- function(dl_var, dl_dates,
   } else if(dl_time_step %in% c("8d", "8D", "8day", "8Day", "8-day", "8-daily", "weekly")){
     dl_time_step <- "8-day"
   } else {
-    stop("'dl_time_step value not recognised, please choose one of : 'day', '8-day', 'month'")
+    stop("'dl_time_step' value not recognised, please choose one of : 'day', '8-day', 'month'")
   }
   
   # Set start and end dates for download
-  # TODO: Correct this based on the time-step
-  # Need special setup for 8-day and monthly requests
-  if(dl_time_step == "day"){
+  # NB: 8-day files are initially handled as daily timesteps
+  if(dl_time_step %in% c("day", "8-day")){
     start_date <- as.Date(dl_dates[1])
     if(length(dl_dates) == 2){
       end_date <- as.Date(dl_dates[2])
     } else{
       end_date <- start_date
     }
-  } else if(dl_time_step == "8-day"){
-    stop("8-day time-steps not yet implemented")
   } else if(dl_time_step == "month"){
-    stop("month time-steps not yet implemented")
+    # NB: Always start with the first day of the year via floor_date()
+    # Later in the script the full range of days for the chosen month are accounted for
+    start_date <- floor_date(ymd(dl_dates[1]), "month")
+    if(length(dl_dates) == 2){
+      end_date <- floor_date(ymd(dl_dates[2]), "month")
+    } else{
+      end_date <- start_date
+    }
   } else {
     stop("'dl_time_step value not recognised, please choose one of : 'day', '8-day', 'month'")
+  }
+  
+  # Check that start_date and end_date objects are proper date format
+  if(!inherits(start_date, "Date") | !inherits(end_date, "Date")){
+    stop("Please ensure that 'dl_dates' are provided in 'YYYY-MM-DD' format.")
   }
   
   # Check chosen variable against chosen data product
@@ -106,7 +115,7 @@ download_nc <- function(dl_var, dl_dates,
         message("No atmospheric correction chosen, defaulting to 'nirswir' to match 'dl_sensor = MODIS'.")
         dl_correction <- "nirswir"
       } else if(dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B")){
-        message(paste0("No atmospheric correction chosen, defaulting to 'polymer' to match 'dl_sensor = ",dl_sensor,"'.."))
+        message(paste0("No atmospheric correction chosen, defaulting to 'polymer' to match 'dl_sensor = ",dl_sensor,"'."))
         dl_correction <- "polymer"
       }
     } else if(!dl_correction %in% c("polymer", "nirswir")){
@@ -142,57 +151,63 @@ download_nc <- function(dl_var, dl_dates,
     }
   }
   
+  # Create floor and ceiling date objects based on which sensor has been selected
+  # TODO: Increase data ranges when ODATIS-MR data are uploaded through to 2026
+  if(dl_product == "SEXTANT"){
+    floor_date_sensor <- as.Date("1998-01-01")
+    ceiling_date_sensor <- as.Date(Sys.Date())-7
+  } else if(dl_sensor == "MODIS"){
+    floor_date_sensor <- as.Date("2002-07-04")
+    ceiling_date_sensor <- as.Date("2023-12-31")
+  } else if(dl_sensor == "MERIS"){
+    floor_date_sensor <- as.Date("2002-06-19")
+    ceiling_date_sensor <- as.Date("2012-04-08")
+  } else if(dl_sensor == "OLCI-A"){
+    floor_date_sensor <- as.Date("2016-04-26")
+    ceiling_date_sensor <- as.Date("2023-12-31")
+  } else if(dl_sensor == "OLCI-B"){
+    floor_date_sensor <- as.Date("2018-05-15")
+    ceiling_date_sensor <- as.Date("2023-12-31")
+  }
+  
   # Check chosen dates against chosen data product, sensor, and correction
-  if(toupper(dl_product) == "SEXTANT"){
-    if(start_date < as.Date("1998-01-01") | end_date > as.Date(Sys.Date())-7){
-      stop("SEXTANT data are only available from 1998-01-01 to roughly 1 week before the present date. Please adjust your date range accordingly.")
-    }
-  } else if(dl_product == "ODATIS-MR"){
-    if(dl_sensor == "MODIS"){
-      # TODO: Increase data ranges when the data are uploaded through to 2026
-      if(start_date < as.Date("2002-07-04") | end_date > as.Date("2023-12-31")){
-        stop(paste0("ODATIS-MR MODIS data are only available from 2002-07-04 to 2023-12-31. Please adjust your date range accordingly."))
-      }
-    } else if(dl_sensor == "MERIS"){
-      if(start_date < as.Date("2002-06-19") | end_date > as.Date("2012-04-08")){
-        stop(paste0("ODATIS-MR MERIS data are only available from 2013-07-01 to . Please adjust your date range accordingly."))
-      }
-    } else if(dl_sensor == "OLCI-A"){
-      if(start_date < as.Date("2016-04-26") | end_date > as.Date("2023-12-31")){
-        stop(paste0("ODATIS-MR OLCI-A data are only available from 2016-04-26 to 2023-12-31. Please adjust your date range accordingly."))
-      }
-    } else if(dl_sensor == "OLCI-B"){
-      if(start_date < as.Date("2018-05-15") | end_date > as.Date("2023-12-31")){
-        stop(paste0("ODATIS-MR OLCI-B data area only available from 2018-05-15 to 2023-12-31. Please adjust your date range accordingly."))
-      }
-    }
+  if(start_date < floor_date_sensor | end_date > ceiling_date_sensor){
+    stop(paste0("The chosen date range is outside of the available data range for : ",
+                  dl_product, " - ", dl_sensor, " - ", dl_correction, ". \n",
+                "Available data range is from ",floor_date_sensor," to ",ceiling_date_sensor,". Please adjust your date range accordingly."))
+  }
+  
+  # Check if SEXTANT data are being requested and correct time step to daily if required
+  if(dl_product == "SEXTANT" & dl_time_step != "day"){
+    message("SEXTANT data product only contains daily data. 'dl_time_step' adjusted accordingly.")
+    dl_time_step <- "day"
   }
   
   # TODO: 
   # Create a more intelligent logic gate that chooses the best product, sensor, and correction based on the variable and download dates chosen
-  # It must create messages for the user letting them know what has been chosen
-  # This could also be made to favour higher resolution data
-  # The messages could briefly explain why the choice was made
+  # It must create messages for the user letting them know what has been chosen and why
   # This would address the TODO item of choosing the 'best' chl-a etc. data given the bbox etc.
   
   # Iterate over each date in the range
-  # TODO: This will need to be reworked if the user is requesting 8-day or monthly data
   current_date <- start_date
   while(current_date <= end_date){
     
     # Prep date strings
+    # NB: Will intentionally be overwritten below if requesting 8-day data
     dl_date <- current_date
     dl_date_flat <- gsub("-", "", dl_date)
     dl_year <- substr(dl_date, start = 1, stop = 4)
     dl_month <- substr(dl_date, start = 6, stop = 7)
     dl_day <- substr(dl_date, start = 9, stop = 10)
-    url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
     
     # Get URL specifics for SEXTANT
     if(toupper(dl_product) == "SEXTANT"){
       
       # Base URL
       url_base <- "ftp://ftp.ifremer.fr/ifremer/cersat/products/gridded/ocean-color/atlantic"
+      # TODO: Ensure that 'url_year_doy' isn't used by products other than SEXTANT
+      # At the moment this is correct, but could change if new products are added
+      url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
       
       # Prep file stub string
       if(toupper(dl_var) %in% c("SPM", "SPIM")){
@@ -216,16 +231,10 @@ download_nc <- function(dl_var, dl_dates,
       
       # Prep sensor strings
       dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
-      if(dl_sensor == "OLCI-A"){
-        dl_sensor_chunk <- "OLA"
-      } else if(dl_sensor == "OLCI-B"){
-        dl_sensor_chunk <- "OLB"
-      } else if(dl_sensor == "MERIS"){
-        dl_sensor_chunk <- "MER"
-      } else if(dl_sensor == "MODIS"){
-        dl_sensor_chunk <- "MOD"
+      if(grepl("OLCI", dl_sensor)){
+        dl_sensor_chunk <- gsub("CI-", "", dl_sensor)
       } else {
-        stop("Please check the value given for 'dl_sensor'")
+        dl_sensor_chunk <- substr(dl_sensor, start = 1, stop = 3)
       }
       
       # Prep correction strings
@@ -236,20 +245,6 @@ download_nc <- function(dl_var, dl_dates,
         dl_correction_chunk <- "NS"
       } else {
         stop("Please check the value given for 'dl_correction'")
-      }
-      
-      # Prep time-step string
-      if(dl_time_step == "day"){
-        dl_time_step_chunk <- "DAY"
-      } else if(dl_time_step == "8-day"){
-        # TODO: Need to think about how to manage the 8 day jumps
-        # Would be ideal to be able to quickly access the HTML structure within the chosen years+months of data
-        dl_time_step_chunk <- "8D"
-      } else if(dl_time_step == "month"){
-        dl_time_step_chunk <- "MO"
-        dl_date_flat <- paste0(format(floor_date(ymd(dl_date), "month"), "%Y%m%d"), "-", format(ceiling_date(ymd(dl_date), "month") - days(1), "%Y%m%d"))
-      } else {
-        stop("Please check the value given for 'dl_time_step'")
       }
       
       # Prep the variable string
@@ -273,9 +268,49 @@ download_nc <- function(dl_var, dl_dates,
         stop("Please check the value given for 'dl_sensor'")
       }
       
+      # Prep time-step string
+      if(dl_time_step == "day"){
+        dl_time_step_chunk <- "DAY"
+      } else if(dl_time_step == "8-day"){
+        dl_time_step_chunk <- "8D"
+        
+        # Get directory content
+        url_8day_dir <- paste("https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE", 
+                              dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, "catalog.html", sep = "/")
+        url_8day_catalog <- grep("\\d{2}/catalog\\.html", readLines(url_8day_dir), value = TRUE)
+        url_8day_days <- unique(unlist(regmatches(url_8day_catalog, gregexpr("\\d+", url_8day_catalog))))
+        url_8day_dates <- as.Date(paste(dl_year, dl_month, url_8day_days, sep = "/"))
+        if(length(url_8day_dates) < 3 | length(url_8day_dates) > 5) stop("Something has gone wrong with the 8-day HTML scraping.")
+        
+        # Select closest date
+        date_diffs <- abs(as.numeric(url_8day_dates - current_date))
+        dl_date <- url_8day_dates[which.min(date_diffs)]
+        dl_day <- substr(dl_date, start = 9, stop = 10)
+        dl_date_flat <- paste0(format(dl_date, "%Y%m%d"), "-", format(dl_date+7, "%Y%m%d"))
+        
+        # Overwrite current date to match the 8-day value
+        current_date <- dl_date
+        
+        # Double check that the product ceiling date has not been surpassed and correct accordingly
+        # Note that the last file for every year in the ODATIS-MR product catalog is not 8 days of data
+        # It is whatever the start date is, up to the last date of the year, or the last date of the product itself
+        if(year(dl_date+7) > year(dl_date)){
+          dl_date_flat <- paste0(format(dl_date, "%Y%m%d"), "-", format(as.Date(paste(dl_year, 12, 31, sep = "/")), "%Y%m%d"))
+        }
+        if(dl_date+7 > ceiling_date_sensor){
+          dl_date_flat <- paste0(format(dl_date, "%Y%m%d"), "-", format(ceiling_date_sensor, "%Y%m%d"))
+        }
+        
+      } else if(dl_time_step == "month"){
+        dl_time_step_chunk <- "MO"
+        dl_date_flat <- paste0(format(floor_date(ymd(dl_date), "month"), "%Y%m%d"), "-", format(ceiling_date(ymd(dl_date), "month") - days(1), "%Y%m%d"))
+      } else {
+        stop("Please check the value given for 'dl_time_step'")
+      }
+      
       # Product URL
       url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
-      file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",toupper(dl_time_step),"_00.nc")
+      file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",dl_time_step_chunk,"_00.nc")
       nc_file <- file.path(output_dir, file_name)
       
     } else {
@@ -328,9 +363,14 @@ download_nc <- function(dl_var, dl_dates,
       }
     }
     
-    # Move to the next day
-    # TODO: Change this to match the requested time-step
-    current_date <- current_date + 1
+    # Move to next time step depending on day, 8-day, or month
+    if(dl_time_step == "day"){
+      current_date <- current_date + 1
+    } else if(dl_time_step == "8-day"){
+      current_date <- current_date + 8
+    } else if(dl_time_step == "month"){
+      current_date <- current_date %m+% months(1)
+    }
   }
 }
 
@@ -348,7 +388,7 @@ plot_nc <- function(nc_file, bbox = NULL,
   
   # Peek inside the file
   # ncdump::NetCDF(nc_file)
-  nc_var_info <- ncdump::NetCDF(nc_file)$variable
+  # nc_var_info <- ncdump::NetCDF(nc_file)$variable
   # nc_var_atts <- ncdump::NetCDF(nc_file)$attribute$global
   
   # Get the relevant snippet from the file
@@ -399,13 +439,24 @@ plot_nc <- function(nc_file, bbox = NULL,
   # Get time attribute based on file structure
   if(grepl("SPIM-ATL|CHL-ATL", nc_file)){
     time <- ncvar_get(nc_data, "time")
+    time_step <- "daily"
     plot_date <- as.Date(as.POSIXct(time, origin = "1998-01-01"))
   } else if(grepl("L3m_", nc_file)){
-    # TODO: Correct this when running the code for 8-day and monthly data
-    time <- ncatt_get(nc_data, varid = 0)[["period_start_day"]]
-    plot_date <- as.Date(time, format = "%Y%m%d")
+    start_date <- as.Date(ncatt_get(nc_data, varid = 0)[["period_start_day"]], format = "%Y%m%d")
+    end_date <- as.Date(ncatt_get(nc_data, varid = 0)[["period_end_day"]], format = "%Y%m%d")
+    time_step <- ncatt_get(nc_data, varid = 0)[["product_type"]]
+    plot_date <- as.Date(ncatt_get(nc_data, varid = 0)[["period_start_day"]], format = "%Y%m%d")
   } else {
     stop("Date value cannot be inferred from file structure.")
+  }
+  
+  # Create plot title based on time step
+  if(time_step == "daily"){
+    plot_title <- paste("Map of", nc_var_name, "on", plot_date)
+    title_size <- 10
+  } else {
+    plot_title <- paste("Map of", nc_var_name, "from", start_date, "to", end_date)
+    title_size <- 8
   }
 
   # Close the NetCDF file
@@ -444,13 +495,18 @@ plot_nc <- function(nc_file, bbox = NULL,
                        fill = "grey80") +
     geom_tile() +
     scale_fill_viridis_c(var_label) +
-    labs(title = paste("Map of", nc_var_name, "on", plot_date),
+    labs(title = plot_title,
          subtitle = paste0("Source : ",nc_file),
          x = "Longitude [°E]", y = "Latitude [°N]") +
     coord_quickmap(xlim = bbox[1:2], ylim = bbox[3:4]) +
     theme_minimal() +
     theme(legend.position = "bottom", 
-          plot.subtitle = element_text(size = 6))
+          plot.title = element_text(size = title_size),
+          plot.subtitle = element_text(size = 6),
+          axis.title = element_text(size = 8),
+          axis.text = element_text(size = 6),
+          legend.title = element_text(size = 8),
+          legend.text = element_text(size = 6))
   
   # Determine plot dimensions, save, and exit
   if(is.null(plot_width)) plot_width <- 6
@@ -458,7 +514,7 @@ plot_nc <- function(nc_file, bbox = NULL,
   ggsave(filename = plot_name, plot = p, width = plot_width, height = plot_height)
   message(paste0("Image saved at: ",plot_name))
 }
-#
+
 
 # Examples ----------------------------------------------------------------
 
@@ -551,6 +607,28 @@ download_nc(
   overwrite = FALSE
 )
 
+# Download a few 8-day averages of Chl a data
+download_nc(
+  dl_var = "CHL",
+  dl_dates = c("2018-12-01", "2019-01-25"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "OLCI-A",
+  dl_time_step = "8-day",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
+# Download a few months of Turbidity data from OLCI-A
+download_nc(
+  dl_var = "T",
+  dl_dates = c("2019-01-01", "2019-03-01"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "OLCI-A",
+  dl_time_step = "month",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
 
 ## Plotting ---------------------------------------------------------------
 
@@ -616,6 +694,24 @@ plot_nc(
   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
   plot_width = 7,
   plot_height = 6,
+  output_dir = "~/Downloads"
+)
+
+# Plot an 8-day average of Chl a data
+plot_nc(
+  nc_file = "~/Downloads/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
+  # bbox = c(2, 6, 41, 44),
+  plot_width = 5,
+  plot_height = 5,
+  output_dir = "~/Downloads"
+)
+
+# Plot one month of turbidity data
+plot_nc(
+  nc_file = "~/Downloads/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
+  # bbox = c(2, 6, 41, 44),
+  plot_width = 5,
+  plot_height = 5,
   output_dir = "~/Downloads"
 )
 
