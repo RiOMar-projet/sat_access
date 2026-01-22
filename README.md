@@ -68,15 +68,16 @@ You will know it is working if you see activity in the console as it downloads t
 
 ## R
 
+**NB:** The following requirements are only for `sat_access.R`, these requirements can be ignored if one chooses to use `sat_access_script.R` instead.
+
 -   R: 4.x
 -   Packages:
-    -   argparse (for `sat_access.R` _not_ `sat_access_script.R`)
+    -   argparse
     -   ncdf4
     -   curl
+    -   lubridate
     -   reshape2
     -   ggplot2
-
-**NB:** The following requirements are only for `sat_access.R`, these requirements can be avoided if one chooses to use `sat_access_script.R` instead.
 
 To check if you have R installed, open a terminal and type:
 
@@ -302,10 +303,54 @@ To address this issue open the `sat_access.R` script in your IDE of choice (e.g.
 options(python_cmd = "C:/Path/To/Your/Python/python.exe")
 ```
 
-#  TO DO
+# TO DO
 
 -   Add knowledge of which algorithms produce best results by region
 -   Allow function to automatically choose the best processing algorithm for the given request
+-   Add `ODATIS-MR` downloading functionality for 8-day and monthly data to all scripts
+-   Add `ODATIS-MR` daily downloading functionality to `sat_access.py` and `sat_access.R`
+-   Add `ODATIS-MR` plotting functionality to `sat_access.py` and `sat_access.R`
+
+# Updates
+
+## 2026-01-22
+
+-   Added the ability to plot all of the daily data files that can be downloaded via `sat_access_script.R`.
+-   Created the __Updates__ section and populated it with the history of the project to date.
+
+## 2026-01-21
+
+-   Added the ability to download all of the different products within `ODATIS-MR` to `sat_access_script.R`.
+
+## 2025-01-19
+
+-   Updated __README__ documentation to cover the addition of `sat_access_script.R` to the project.
+
+## 2025-01-16
+
+- Based on user feedback, created the `sat_access_script.R`, which is run like a 'traditional' R script and does not use the command line.
+
+## 2025-01-15
+
+-   Improved logic gates around the recognition of already downloaded files in `sat_access.R` and `sat_access.py`.
+
+## 2025-01-15
+
+-   Improved logic gates around the unzipping of files in `sat_access.R`.
+
+## 2025-12-17
+
+-   Extended functionality of `sat_access.py` to be able to concatenate daily files and create GIFs.
+-   Updated documentation to match new arguments for `sat_access.py`.
+-   Improved logic gates for handling various requests.
+
+## 2025-12-16
+
+-   Added __TO DO__ section.
+
+## 2025-11-26
+
+-   Started `sat_access` project.
 
 # License
 

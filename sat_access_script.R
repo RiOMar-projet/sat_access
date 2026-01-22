@@ -7,6 +7,10 @@
 #              download SPM or chlorophyll-a NetCDF files from a specified URL
 #              for given date ranges and plot the data.
 
+# Useful documentation:
+# ODATIS-MR user guide (en français)
+# https://www.aviso.altimetry.fr/fileadmin/documents/data/tools/hdbk_ODATIS_MR.pdf
+
 
 # Libraries ---------------------------------------------------------------
 
@@ -110,8 +114,35 @@ download_nc <- function(dl_var, dl_dates,
     }
   }
   
+  # Check that the chosen product, sensor, correction combos are possible
+  if(dl_product == "SEXTANT"){
+    if(!toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")){
+      stop("SEXTANT data product only contains SPM and Chl a data. Please adjust `dl_var` accordingly.")
+    }
+  } else if(dl_product == "ODATIS-MR"){
+    if(dl_sensor == "MODIS"){
+      if(!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "T", "TUR")){
+        stop("ODATIS-MR MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly.")
+      }
+    } else if(dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B")){
+      if(!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "T", "TUR")){
+        stop(paste0("ODATIS-MR : ",dl_sensor," data product does not contain the requested variable. Please adjust your variable choice accordingly."))
+      }
+    }
+  }
+  
+  # Check that the chosen correction against chosen data product and sensor and correct if necessary
+  if(dl_product == "ODATIS-MR"){
+    if(dl_sensor == "MODIS" & dl_correction != "nirswir"){
+      message("ODATIS-MR : MODIS data product only uses the 'nirswir' atmospheric correction. 'dl_correction' adjusted accordingly.")
+      dl_correction <- "nirswir"
+    } else if(dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B") & dl_correction != "polymer"){
+      message(paste0("ODATIS-MR : ",dl_sensor," data product only uses the 'polymer' atmospheric correction. 'dl_correction' adjusted accordingly."))
+      dl_correction <- "polymer"
+    }
+  }
+  
   # Check chosen dates against chosen data product, sensor, and correction
-  # TODO: This could be optimized
   if(toupper(dl_product) == "SEXTANT"){
     if(start_date < as.Date("1998-01-01") | end_date > as.Date(Sys.Date())-7){
       stop("SEXTANT data are only available from 1998-01-01 to roughly 1 week before the present date. Please adjust your date range accordingly.")
@@ -228,9 +259,9 @@ download_nc <- function(dl_var, dl_dates,
         dl_var_chunk <- "CHL-OC5"
       } else if(dl_var %in% c("RRS", "NRRS")){
         if(dl_sensor == "MODIS"){
-          dl_var_chunk <- "NRRS560"
-        } else {
           dl_var_chunk <- "NRRS555"
+        } else {
+          dl_var_chunk <- "NRRS560"
         }
       } else if(dl_var %in% c("SPM", "SPIM")){
         dl_var_chunk <- "SPM-G"
@@ -275,7 +306,7 @@ download_nc <- function(dl_var, dl_dates,
         if(grepl("Server denied you to change to the given directory", e$message[1])){
           e$message <- " not found on server."
         }
-        message(paste0(file_name,e$message[1]))
+        message(paste0(file_name," : ",e$message[1]))
       })
       
       # Unzip if necessary
@@ -302,26 +333,59 @@ download_nc <- function(dl_var, dl_dates,
     current_date <- current_date + 1
   }
 }
-#
+
 
 # The plotting function ---------------------------------------------------
 
-plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL, output_dir) {
+plot_nc <- function(nc_file, bbox = NULL, 
+                    plot_width = NULL, plot_height = NULL, 
+                    output_dir) {
   
   # Check for file
   if(!file.exists(nc_file)){
     return(message(paste0(nc_file," cannot be found.")))
   }
   
-  # Get product specifics
-  if(grepl("SPIM", nc_file)){
-    nc_var_name <- "analysed_spim"
-    var_label <- "SPM [g m-3]"
-  } else if(grepl("CHL", nc_file)){
-    nc_var_name <- "analysed_chl_a"
-    var_label <- "chl a [mg m-3]"
+  # Peek inside the file
+  # ncdump::NetCDF(nc_file)
+  nc_var_info <- ncdump::NetCDF(nc_file)$variable
+  # nc_var_atts <- ncdump::NetCDF(nc_file)$attribute$global
+  
+  # Get the relevant snippet from the file
+  file_snippets <- unlist(strsplit(basename(nc_file), "_"))
+  # SEXTANT files
+  if(length(file_snippets) == 1){
+    if(grepl("SPIM-ATL", nc_file)){
+      nc_var_name <- "analysed_spim"
+    } else if(grepl("CHL-ATL", nc_file)){
+      nc_var_name <- "analysed_chl_a"
+    } else {
+      stop("File structure cannot be inferred from file name. Please ensure the file was downloaded via the function found in this script.")
+    }
+  # ODATIS-MR files
+  } else if(length(file_snippets) == 9){
+    nc_var_name <- paste0(file_snippets[7],"_mean")
   } else {
-    stop("Variable not yet available")
+    stop("File structure cannot be inferred from file name. Please ensure the file was downloaded via the function found in this script.")
+  }
+  
+  # Get plotting label based on variable name
+  if(grepl("spim|SPIM|SPM", nc_var_name)){
+    var_label <- "SPM [g m-3]"
+  } else if(grepl("chl|CHL", nc_var_name)){
+    var_label <- "Chl a [mg m-3]"
+  } else if(grepl("CDOM", nc_var_name)){
+    var_label <- "CDOM [m-1]"
+  } else if(grepl("SST", nc_var_name)){
+    var_label <- "SST [°C]"
+  } else if(grepl("T-FNU", nc_var_name)){
+    var_label <- "Turbidity [FNU]"
+  } else if(grepl("NRRS560", nc_var_name)){
+    var_label <- "Rrs at 560 nm [sr-1]"
+  } else if(grepl("NRRS555", nc_var_name)){
+    var_label <- "Rrs at 555 nm [sr-1]"
+  } else {
+    stop("Variable label cannot be inferred from variable name.")
   }
   
   # Open the NetCDF file
@@ -330,9 +394,20 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
   # Extract longitude, latitude, and the specified variable
   lon <- ncvar_get(nc_data, "lon")
   lat <- ncvar_get(nc_data, "lat")
-  time <- ncvar_get(nc_data, "time")
   var <- ncvar_get(nc_data, nc_var_name)
   
+  # Get time attribute based on file structure
+  if(grepl("SPIM-ATL|CHL-ATL", nc_file)){
+    time <- ncvar_get(nc_data, "time")
+    plot_date <- as.Date(as.POSIXct(time, origin = "1998-01-01"))
+  } else if(grepl("L3m_", nc_file)){
+    # TODO: Correct this when running the code for 8-day and monthly data
+    time <- ncatt_get(nc_data, varid = 0)[["period_start_day"]]
+    plot_date <- as.Date(time, format = "%Y%m%d")
+  } else {
+    stop("Date value cannot be inferred from file structure.")
+  }
+
   # Close the NetCDF file
   nc_close(nc_data)
   
@@ -342,6 +417,7 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
   var_df$lon <- lon[var_df$lon_idx]
   var_df$lat <- lat[var_df$lat_idx]
   
+  # Set bounding box if none exists
   if(is.null(bbox)){
     bbox <- c(
       min(lon, na.rm = TRUE),
@@ -355,21 +431,26 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
   # Filter df to bounding box
   var_df_sub <- var_df[var_df$lon >= bbox[1] & var_df$lon <= bbox[2],]
   var_df_sub <- var_df_sub[var_df_sub$lat > bbox[3] & var_df_sub$lat <= bbox[4], ]
-  
-  # Get date for plot label
-  plot_date <- as.Date(as.POSIXct(time, origin = "1998-01-01"))
+  var_df_sub <- var_df_sub[!is.na(var_df_sub$value),]
   
   # Set plot name
   plot_name <- file.path(output_dir, paste0(nc_var_name,"_",plot_date,".png"))
   
   # Plot using ggplot2
   p <- ggplot(var_df_sub, aes(x = lon, y = lat, fill = value)) +
+    annotation_borders(regions = c("France", "Spain", "Germany", "UK", "Italy", "Andorra", 
+                                   "Portugal", "Belgium", "Netherlands", "Switzerland", 
+                                   "Austria", "Ireland", "Greece", "Luxembourg", "Liechtenstein"), 
+                       fill = "grey80") +
     geom_tile() +
     scale_fill_viridis_c(var_label) +
     labs(title = paste("Map of", nc_var_name, "on", plot_date),
-         x = "Longitude", y = "Latitude") +
+         subtitle = paste0("Source : ",nc_file),
+         x = "Longitude [°E]", y = "Latitude [°N]") +
+    coord_quickmap(xlim = bbox[1:2], ylim = bbox[3:4]) +
     theme_minimal() +
-    theme(legend.position = "bottom")
+    theme(legend.position = "bottom", 
+          plot.subtitle = element_text(size = 6))
   
   # Determine plot dimensions, save, and exit
   if(is.null(plot_width)) plot_width <- 6
@@ -377,7 +458,7 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
   ggsave(filename = plot_name, plot = p, width = plot_width, height = plot_height)
   message(paste0("Image saved at: ",plot_name))
 }
-
+#
 
 # Examples ----------------------------------------------------------------
 
@@ -387,6 +468,7 @@ plot_nc <- function(nc_file, bbox = NULL, plot_width = NULL, plot_height = NULL,
 # Possible variables: SPM, CHLA, CDOM, RRS, TUR, SST
 
 # Download a few days of SPM data
+# NB: If no product is chosen, CHL and SPM default to SEXTANT
 download_nc(
   dl_var = "SPM",
   dl_dates = c("2025-09-01", "2025-09-05"),
@@ -394,15 +476,36 @@ download_nc(
   overwrite = FALSE # Change to TRUE to force downloads
 )
 
-# Download one day of Chl a data
+# Download a few days of CHL data
+# NB: If no product is chosen, CHL and SPM default to SEXTANT
 download_nc(
   dl_var = "CHL",
-  dl_dates = c("2025-12-25"),
+  dl_dates = c("2025-09-01", "2025-09-05"),
   output_dir = "~/Downloads", # Change as desired/required
   overwrite = FALSE # Change to TRUE to force downloads
 )
 
-# Download a few days day of CDOM data
+# Download one day of SPM data from MODIS
+download_nc(
+  dl_var = "SPM",
+  dl_dates = c("2008-12-25"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "MODIS",
+  output_dir = "~/Downloads", # Change as desired/required
+  overwrite = FALSE # Change to TRUE to force downloads
+)
+
+# Download one day of Chl a data from MERIS
+download_nc(
+  dl_var = "CHL",
+  dl_dates = c("2008-12-25"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "MERIS",
+  output_dir = "~/Downloads", # Change as desired/required
+  overwrite = FALSE # Change to TRUE to force downloads
+)
+
+# Download a few days of CDOM data
 download_nc(
   dl_var = "CDOM",
   dl_dates = c("2022-09-01", "2022-09-05"),
@@ -410,7 +513,7 @@ download_nc(
   overwrite = FALSE
 )
 
-# Download one day day of SST data
+# Download one day of SST data
 download_nc(
   dl_var = "SST",
   dl_dates = "2014-01-01",
@@ -418,14 +521,47 @@ download_nc(
   overwrite = FALSE
 )
 
+# Download one day of turbidity data from OLCI-B
+download_nc(
+  dl_var = "T",
+  dl_dates = "2019-01-01",
+  dl_product = "ODATIS-MR",
+  dl_sensor = "OLCI-B",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
+# Download RRS data from MODIS (W_nm 555)
+download_nc(
+  dl_var = "RRS",
+  dl_dates = "2019-01-01",
+  dl_product = "ODATIS-MR",
+  dl_sensor = "MODIS",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
+# Download RRS data from OLCI-A (W_nm 560)
+download_nc(
+  dl_var = "RRS",
+  dl_dates = "2019-01-01",
+  dl_product = "ODATIS-MR",
+  dl_sensor = "OLCI-A",
+  output_dir = "~/Downloads",
+  overwrite = FALSE
+)
+
 
 ## Plotting ---------------------------------------------------------------
+
+# NB: plot_nc() will automagically detect the necessary .nc structure and variable from the file name
+# Note that it is only designed to work with files downloaded via download_nc()
 
 # Plot an SPM NetCDF file
 plot_nc(
   nc_file = "~/Downloads/20250905-EUR-L4-SPIM-ATL-v01-fv01-OI.nc", 
-  bbox =  c(-5, 5, 35, 45), 
-  plot_width = 6, 
+  bbox = c(3, 8, 41, 44), 
+  plot_width = 5, 
   plot_height = 5, 
   output_dir = "~/Downloads"
 )
@@ -433,9 +569,53 @@ plot_nc(
 # Plot a Chl a NetCDF file
 plot_nc(
   nc_file = "~/Downloads/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc", 
-  bbox =  c(-2.5, -0.5, 44, 48), 
-  plot_width = 6, 
+  bbox = c(-3.5, -0.5, 44, 48), 
+  plot_width = 5, 
   plot_height = 9, 
+  output_dir = "~/Downloads"
+)
+
+# Plot a CDOM NetCDF file
+# NB: Providing no 'bbox' argument will plot the full extent of the data in the file
+plot_nc(
+  nc_file = "~/Downloads/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc", 
+  plot_width = 7, 
+  plot_height = 6, 
+  output_dir = "~/Downloads"
+)
+
+# Plot an SST NetCDF file
+plot_nc(
+  nc_file = "~/Downloads/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
+  bbox = c(-5, 10, 40, 55), 
+  plot_width = 8, 
+  plot_height = 6, 
+  output_dir = "~/Downloads"
+)
+
+# Plot a turbidity NetCDF file
+plot_nc(
+  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
+  bbox = c(2, 6, 41, 44),
+  plot_width = 6,
+  plot_height = 5,
+  output_dir = "~/Downloads"
+)
+
+# Plot an RRS NetCDF file from MODIS
+plot_nc(
+  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
+  bbox = c(2, 5, 41, 45),
+  plot_width = 7,
+  plot_height = 6,
+  output_dir = "~/Downloads"
+)
+
+# Plot an RRS NetCDF file from OLCI-A
+plot_nc(
+  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
+  plot_width = 7,
+  plot_height = 6,
   output_dir = "~/Downloads"
 )
 
