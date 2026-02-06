@@ -8,15 +8,17 @@
 #              for given date ranges and plot the data.
 
 # Useful documentation:
-# ODATIS-MR user guide (en français)
+# ODATIS-MR user guide (en français) :
 # https://www.aviso.altimetry.fr/fileadmin/documents/data/tools/hdbk_ODATIS_MR.pdf
+# ODATIS-MR URL interface :
+# https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/catalog.html
 
 
 # Libraries ---------------------------------------------------------------
 
 # Check for missing libraries and install them if necessary
-if (!all(c("ncdf4", "curl", "reshape2", "ggplot2") %in% installed.packages())) {
-  install.packages(c("ncdf4", "curl", "lubridate", "reshape2", "ggplot2"), repos = "https://cloud.r-project.org/")
+if (!all(c("ncdf4", "curl", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
+  install.packages(c("ncdf4", "curl", "lubridate", "reshape2", "maps", "ggplot2"), repos = "https://cloud.r-project.org/")
 }
 
 # Activate libraries
