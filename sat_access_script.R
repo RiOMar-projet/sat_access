@@ -21,12 +21,12 @@
 # Libraries ---------------------------------------------------------------
 
 # Check for missing libraries and install them if necessary
-if (!all(c("ncdfCF", "curl", "lubridate", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
+if (!all(c("ncdf4", "curl", "lubridate", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
   install.packages(c("ncdfCF", "curl", "lubridate", "reshape2", "maps", "ggplot2"), repos = "https://cloud.r-project.org/")
 }
 
 # Activate libraries
-library(ncdfCF)    # For accessing/reading NetCDF files
+library(ncdf4)     # For accessing/reading NetCDF files
 suppressPackageStartupMessages(library(curl)) # For FTP downloading
 library(lubridate) # For working with dates
 library(reshape2)  # For data reshaping
@@ -90,7 +90,11 @@ download_nc <- function(dl_var, dl_dates,
     stop("Please ensure that the longitude values in 'dl_bbox' are between -180 and 180.")
   } else if(any(dl_bbox < -90) | any(dl_bbox > 90)){
     stop("Please ensure that the latitude values in 'dl_bbox' are between -90 and 90.")
-  } 
+  } else if(dl_bbox[1] >= dl_bbox[2]){ 
+    stop("Please ensure that the first value in 'dl_bbox' (lonmin) is less than the second value (lonmax).") 
+  } else if(dl_bbox[3] >= dl_bbox[4]){ 
+    stop("Please ensure that the third value in 'dl_bbox' (latmin) is less than the fourth value (latmax).") 
+  }
   
   # Check that start_date and end_date objects are proper date format
   if(!inherits(start_date, "Date") | !inherits(end_date, "Date")){
@@ -342,7 +346,7 @@ download_nc <- function(dl_var, dl_dates,
       # Product URL
       url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
       file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",dl_time_step_chunk,"_00.nc")
-      nc_file <- file.path(output_dir, file_name)
+      # nc_file <- file.path(output_dir, file_name)
       
     } else {
       stop("Please check the value used for 'dl_product'")
@@ -353,9 +357,9 @@ download_nc <- function(dl_var, dl_dates,
     file_name_full <- file.path(output_dir, file_name)
     
     # Fetch file
-    if(file.exists(nc_file) & !overwrite){
+    if(file.exists(file_name_full) & !overwrite){
       
-      message(paste0(nc_file," already exists. Set 'overwrite = TRUE' to force the download."))
+      message(paste0(file_name_full," already exists. Set 'overwrite = TRUE' to force the download."))
       
     } else {
       
@@ -364,57 +368,108 @@ download_nc <- function(dl_var, dl_dates,
         dir.create(output_dir, recursive = TRUE)
       }
       
+      # Check if file already exists and delete it if necessary
+      if(file.exists(file_name_full)){
+        tryCatch({ file.remove(file_name_full) 
+          message(paste("File removed :", file_name_full))
+        }, error = function(e) {
+            message(paste("Impossible to remove file :", e$message)) 
+        })
+      }
+      
       # Subset data by bounding box if possible/requested
       if(!is.null(dl_bbox) & dl_product == "ODATIS-MR"){
         
         # Open the connection
-        nc_con <- open_ncdf(url_final)
-        nc_con$attributes
-        nc_con$var_names
-        peek_ncdf(url_final)
-        str(nc_con)
-        dimnames(nc_con)
-        names(nc_con)
-        groups(nc_con)
-        # dimnames(nc_con)
+        nc_data <- nc_open(url_final)
+        # names(nc_data)
         
-        # Create empty NetCDF file
-        nc_out <- create_ncdf()
-        # subgroup <- nc_out$root$create_subgroup("var")
+        # Extract the longitude and latitude variables
+        lon <- ncvar_get(nc_data, "lon")
+        lat <- ncvar_get(nc_data, "lat")
         
-        # Add all variables
-        for(i in length(names(nc_con))){
-          nc_var_i <- nc_con[[names(nc_con)[i]]]$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
-          # nc_var_i$group
-          nc_out$root$add_variable(nc_var_i)
-          # subgroup$add_variable(nc_var_i)
+        # Find the indices for the bounding box
+        lon_indices <- which(lon >= dl_bbox[1] & lon <= dl_bbox[2])
+        lat_indices <- which(lat >= dl_bbox[3] & lat <= dl_bbox[4])
+        
+        # Subset lon/lat
+        lon_subset <- lon[lon_indices] 
+        lat_subset <- lat[lat_indices]
+        
+        # Determine the start and count for reading the subset
+        lonlat_start <- c(min(lon_indices), min(lat_indices))  # Assuming time is the third dimension
+        lonlat_count <- c(length(lon_indices), length(lat_indices))  # -1 means read all along this dimension
+        
+        # Get variable names
+        # names(nc_data$var)
+        
+        # Load only the desired subset of the variable into memory
+        var_subset <- ncvar_get(nc_data, names(nc_data$var)[1], 
+                                start = lonlat_start, count = lonlat_count)
+        
+        # Get global attributes from the original file
+        global_attrs <- ncatt_get(nc_data, varid = 0)
+        
+        # Close the NetCDF file
+        nc_close(nc_data)
+        
+        # Define the lon/lat dimensions
+        # lon_dim <- ncdim_def(name = "lon", "double", lon_indices, missval = NA, longname = "Longitude", units = "degrees_east")
+        # ncdim_def("lat", "double", lat_indices, missval = NA, longname = "Latitude", units = "degrees_north")
+        lon_dim <- ncdim_def(name = "lon", units = "degrees_east", vals = lon_subset)
+        lat_dim <- ncdim_def(name = "lat", units = "degrees_north", vals = lat_subset)
+        
+        # Define the variable to be put into the NetCDF file
+        var_1_info <- nc_data$var[1]$`SPM-G-NS_mean`
+        var_1 <- ncvar_def(name = var_1_info$name, units = var_1_info$units,
+                           dim = list(lon = lon_dim, lat = lat_dim),
+                           prec = var_1_info$prec, missval = NA, longname = var_1_info$longname)
+        # ncvar_def(output_nc_data, "time", "double", 0, missval = NA, longname = "Time", units = "days since 1900-01-01")
+        
+        # Define the variable in the new NetCDF file
+        
+        # Create a new NetCDF file for the subset
+        # output_nc_data <- nc_create(file_name_full,
+        #                             list(var = list(dim = list(lon = length(lon_indices), lat = length(lat_indices)),
+        #                                             var.dim = list(lon = lon_indices, lat = lat_indices))))
+        output_nc_data <- nc_create(file_name_full, vars = list(var_1), force_v4 = TRUE)
+        
+        # Add the data
+        ncvar_put(nc = output_nc_data, varid = var_1, vals = var_subset)
+        
+        # Additional attributes
+        # ncatt_put(output_nc_data, "lon", "axis", "X")
+        # ncatt_put(output_nc_data, "lat", "axis", "Y")
+        
+        # Define dimensions in the new NetCDF file
+        # ncvar_def(output_nc_data, "lon", "double", lon_indices, missval = NA, longname = "Longitude", units = "degrees_east")
+        # ncvar_def(output_nc_data, "lat", "double", lat_indices, missval = NA, longname = "Latitude", units = "degrees_north")
+        # ncvar_def(output_nc_data, "time", "double", 0, missval = NA, longname = "Time", units = "days since 1900-01-01")
+        
+        # Define the variable in the new NetCDF file
+        # ncvar_def(output_nc_data, var_name, "double", list(lon = lon_indices, lat = lat_indices), missval = NA)
+        
+        # Copy global attributes to the new file
+        for (attr in names(global_attrs)) {
+          ncatt_put(output_nc_data, 0, attr, global_attrs[[attr]])
         }
-        nc_out$variables()
         
-        # Add all attributes
-        for(i in nrow(nc_con$attributes())){
-          nc_out$set_attribute(name = nc_con$attributes()$name[i],
-                               type = nc_con$attributes()$type[i], 
-                               value = nc_con$attributes()$value[i])
-        }
-        # nc_out$attributes <- nc_con$attributes()
-        nc_out$attribute()
-        names(nc_out)
-        nc_out$save(file_name_full)
-        # nc_var <- nc_con[[paste0(dl_var_chunk,"-",dl_correction_chunk,"_mean")]]
-        nc_con <- open_ncdf(url_final)
-        nc_test <- nc_con$clone()
-        nc_test$save(file_name_full)
-
-        nc_test2 <- open_ncdf(file_name_full)
-        peek_ncdf(file_name_full)
-        nc_test2$attributes()
-        nc_test2$var_names
-                
-        str(nc_var)
-        nc_sub <- nc_var$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
-        str(nc_sub)
-        head(nc_sub)
+        # End the definition mode
+        # nc_close(output_nc_data)
+        
+        # Reopen the new NetCDF file in write mode to add data
+        # output_nc_data <- nc_open(output_nc_file_path, write = TRUE)
+        
+        # Write the subset data to the new NetCDF file
+        # ncvar_put(output_nc_data, "longitude", lon[lon_indices])
+        # ncvar_put(output_nc_data, "latitude", lat[lat_indices])
+        # ncvar_put(output_nc_data, var_name, var_subset)
+        
+        # Close the new NetCDF file
+        nc_close(output_nc_data)
+        
+        # Print a message indicating the process is complete
+        message("Subsetting complete. The results are saved as : ", file_name_full)
         
       } else {
         # Download
@@ -513,71 +568,13 @@ plot_nc <- function(nc_file, bbox = NULL,
     stop("Variable label cannot be inferred from variable name.")
   }
   
-  # Open the connection
-  nc_con <- open_ncdf(nc_file)
-  dimnames(nc_con)
-  nc_con$attributes()
+  # Open the NetCDF file
+  nc_data <- nc_open(nc_file)
   
   # Extract longitude, latitude, and the specified variable
-  var <- nc_con[[nc_var_name]]
-  lon <- var[["lon"]]
-  dimnames(var[["lon"]])
+  lon <- ncvar_get(nc_data, "lon")
   lat <- ncvar_get(nc_data, "lat")
-  # var <- ncvar_get(nc_data, nc_var_name)
-
-  
-  
-  # Set bounding box if none exists
-  if(is.null(bbox)){
-    bbox <- c(
-      min(lon, na.rm = TRUE),
-      max(lon, na.rm = TRUE),
-      min(lat, na.rm = TRUE),
-      max(lat, na.rm = TRUE)
-    )
-    message(paste("No bounding box provided, using full extent:", paste(round(bbox, 4), collapse = ", ")))
-  }
-  
-  # Reshape data for ggplot
-  var_df <- melt(var)
-  names(var_df) <- c("lon_idx", "lat_idx", "value")
-  var_df$lon <- lon[var_df$lon_idx]
-  var_df$lat <- lat[var_df$lat_idx]
-  
-
-  
-  # Filter df to bounding box
-  var_df_sub <- var_df[var_df$lon >= bbox[1] & var_df$lon <= bbox[2],]
-  var_df_sub <- var_df_sub[var_df_sub$lat > bbox[3] & var_df_sub$lat <= bbox[4], ]
-  var_df_sub <- var_df_sub[!is.na(var_df_sub$value),]
-  
-
-  nc_con$attributes()
-  peek_ncdf(url_final)
-  str(nc_con)
-  dimnames(nc_con)
-  names(nc_con)
-  groups(nc_con)
-  # dimnames(nc_con)
-  nc_out <- create_ncdf()
-  subgroup <- nc_out$root$create_subgroup("var")
-  for(i in length(names(nc_con))){
-    nc_var_i <- nc_con[[names(nc_con)[i]]]$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
-    nc_var_i$group
-    nc_out$add_variable(nc_var_i)
-    # subgroup$add_variable(nc_var_i)
-  }
-  nc_out$save(file_name_full)
-  nc_out$variables()
-  nc_out$append_attribute()
-  names(nc_out)
-  # nc_var <- nc_con[[paste0(dl_var_chunk,"-",dl_correction_chunk,"_mean")]]
-  
-  str(nc_var)
-  nc_sub <- nc_var$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
-  str(nc_sub)
-  head(nc_sub)
-  
+  var <- ncvar_get(nc_data, nc_var_name)
   
   # Get time attribute based on file structure
   if(grepl("SPIM-ATL|CHL-ATL", nc_file)){
@@ -601,9 +598,31 @@ plot_nc <- function(nc_file, bbox = NULL,
     plot_title <- paste("Map of", nc_var_name, "from", start_date, "to", end_date)
     title_size <- 8
   }
-
+  
   # Close the NetCDF file
   nc_close(nc_data)
+  
+  # Reshape data for ggplot
+  var_df <- melt(var)
+  names(var_df) <- c("lon_idx", "lat_idx", "value")
+  var_df$lon <- lon[var_df$lon_idx]
+  var_df$lat <- lat[var_df$lat_idx]
+  
+  # Set bounding box if none exists
+  if(is.null(bbox)){
+    bbox <- c(
+      min(lon, na.rm = TRUE),
+      max(lon, na.rm = TRUE),
+      min(lat, na.rm = TRUE),
+      max(lat, na.rm = TRUE)
+    )
+    message(paste("No bounding box provided, using full extent:", paste(round(bbox, 4), collapse = ", ")))
+  }
+  
+  # Filter df to bounding box
+  var_df_sub <- var_df[var_df$lon >= bbox[1] & var_df$lon <= bbox[2],]
+  var_df_sub <- var_df_sub[var_df_sub$lat > bbox[3] & var_df_sub$lat <= bbox[4], ]
+  var_df_sub <- var_df_sub[!is.na(var_df_sub$value),]
   
   # Set plot name
   plot_name <- file.path(output_dir, paste0(nc_var_name,"_",plot_date,".png"))
@@ -671,9 +690,9 @@ download_nc(
   dl_dates = c("2008-12-25"),
   dl_product = "ODATIS-MR",
   dl_sensor = "MODIS",
-  dl_bbox = c(7, 8, 43, 45),
+  dl_bbox = c(3, 4, 42.5, 44),
   output_dir = "~/Downloads/MODIS", # Change as desired/required
-  overwrite = FALSE # Change to TRUE to force downloads
+  overwrite = TRUE # Change to TRUE to force downloads
 )
 
 # Download one day of Chl a data from MERIS
@@ -762,7 +781,7 @@ download_nc(
 
 # Plot an SPM NetCDF file
 plot_nc(
-  nc_file = "~/Downloads/20250905-EUR-L4-SPIM-ATL-v01-fv01-OI.nc", 
+  nc_file = "~/Downloads/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc", 
   bbox = c(3, 8, 41, 44), 
   plot_width = 5, 
   plot_height = 5, 
