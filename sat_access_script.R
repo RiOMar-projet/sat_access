@@ -6,6 +6,8 @@
 # Description: This script contains functions that can be used to
 #              download SPM or chlorophyll-a NetCDF files from a specified URL
 #              for given date ranges and plot the data.
+#              The products available via this script are SEXTANT and all files
+#              available on the Acri-ST ftp server for ODATIS products.
 
 # Useful documentation:
 # ODATIS-MR user guide (en français) :
@@ -13,27 +15,29 @@
 # ODATIS-MR URL interface :
 # https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/catalog.html
 
+# rschlegel
+# MuDMxqHn6p9p
 
 # Libraries ---------------------------------------------------------------
 
 # Check for missing libraries and install them if necessary
-if (!all(c("ncdf4", "curl", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
-  install.packages(c("ncdf4", "curl", "lubridate", "reshape2", "maps", "ggplot2"), repos = "https://cloud.r-project.org/")
+if (!all(c("ncdfCF", "curl", "lubridate", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
+  install.packages(c("ncdfCF", "curl", "lubridate", "reshape2", "maps", "ggplot2"), repos = "https://cloud.r-project.org/")
 }
 
 # Activate libraries
-library(ncdf4)    # For reading NetCDF files
-suppressPackageStartupMessages(library(curl)) # For FTP download
+library(ncdfCF)    # For accessing/reading NetCDF files
+suppressPackageStartupMessages(library(curl)) # For FTP downloading
 library(lubridate) # For working with dates
-library(reshape2) # For data reshaping
-library(ggplot2)  # For visualization
+library(reshape2)  # For data reshaping
+library(ggplot2)   # For visualization
 
 
 # The download function ---------------------------------------------------
 
 download_nc <- function(dl_var, dl_dates, 
                         dl_product = NULL, dl_sensor = NULL, 
-                        dl_correction = NULL, dl_time_step = NULL,
+                        dl_correction = NULL, dl_time_step = NULL, dl_bbox = NULL,
                         output_dir, overwrite) {
   
   # Check date range
@@ -77,6 +81,17 @@ download_nc <- function(dl_var, dl_dates,
     stop("'dl_time_step value not recognised, please choose one of : 'day', '8-day', 'month'")
   }
   
+  # Check if dl_bbox was given and return message accordingly
+  if(is.null(dl_bbox)){
+    # Intentionally blank
+  } else if(length(dl_bbox) != 4){
+    stop("Please provide a bounding box in the form of a vector with 4 values: c(lonmin, lonmax, latmin, latmax)")
+  } else if(any(dl_bbox < -180) | any(dl_bbox > 180)){
+    stop("Please ensure that the longitude values in 'dl_bbox' are between -180 and 180.")
+  } else if(any(dl_bbox < -90) | any(dl_bbox > 90)){
+    stop("Please ensure that the latitude values in 'dl_bbox' are between -90 and 90.")
+  } 
+  
   # Check that start_date and end_date objects are proper date format
   if(!inherits(start_date, "Date") | !inherits(end_date, "Date")){
     stop("Please ensure that 'dl_dates' are provided in 'YYYY-MM-DD' format.")
@@ -96,7 +111,15 @@ download_nc <- function(dl_var, dl_dates,
   }
   
   # Get sensors and corrections for ODATIS-MR data products
+  # TODO: Add a logic gate that checks the extent given versus what is available in ODATIS-MR
   if(dl_product == "ODATIS-MR"){
+    
+    if(is.null(dl_bbox)){
+      message("No bounding box provided, data will be downloaded for the full extent of the product.")
+    } else {
+      message(paste("Bounding box provided, data will be downloaded from longitude ",
+                    dl_bbox[1]," to ",dl_bbox[2]," and latitude ",dl_bbox[3]," to ",dl_bbox[4],".", sep = ""))
+    }
     
     # Check chosen sensor against data product
     if(is.null(dl_sensor)){
@@ -127,6 +150,9 @@ download_nc <- function(dl_var, dl_dates,
   
   # Check that the chosen product, sensor, correction combos are possible
   if(dl_product == "SEXTANT"){
+    if(!is.null(dl_bbox)){
+      message("A bounding box was provided, but SEXTANT products cannot be subset at the source. Downloading the full file.")
+    }
     if(!toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")){
       stop("SEXTANT data product only contains SPM and Chl a data. Please adjust `dl_var` accordingly.")
     }
@@ -201,15 +227,14 @@ download_nc <- function(dl_var, dl_dates,
     dl_year <- substr(dl_date, start = 1, stop = 4)
     dl_month <- substr(dl_date, start = 6, stop = 7)
     dl_day <- substr(dl_date, start = 9, stop = 10)
+    url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
     
     # Get URL specifics for SEXTANT
     if(toupper(dl_product) == "SEXTANT"){
       
       # Base URL
+      # TODO: See if the data are stored anywhere with OpeNDAP access
       url_base <- "ftp://ftp.ifremer.fr/ifremer/cersat/products/gridded/ocean-color/atlantic"
-      # TODO: Ensure that 'url_year_doy' isn't used by products other than SEXTANT
-      # At the moment this is correct, but could change if new products are added
-      url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
       
       # Prep file stub string
       if(toupper(dl_var) %in% c("SPM", "SPIM")){
@@ -229,7 +254,11 @@ download_nc <- function(dl_var, dl_dates,
     } else if(toupper(dl_product) == "ODATIS-MR"){
       
       # Base URL
-      url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+      if(is.null(dl_bbox)){
+        url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+      } else {
+        url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+      }
       
       # Prep sensor strings
       dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
@@ -335,31 +364,85 @@ download_nc <- function(dl_var, dl_dates,
         dir.create(output_dir, recursive = TRUE)
       }
       
-      # Download
-      tryCatch({
-        curl::curl_download(url_final, destfile = file_name_full)
-        message(paste0("File downloaded at: ",file_name_full))
-      }, error = function(e) {
-        if(grepl("Server denied you to change to the given directory", e$message[1])){
-          e$message <- " not found on server."
+      # Subset data by bounding box if possible/requested
+      if(!is.null(dl_bbox) & dl_product == "ODATIS-MR"){
+        
+        # Open the connection
+        nc_con <- open_ncdf(url_final)
+        nc_con$attributes
+        nc_con$var_names
+        peek_ncdf(url_final)
+        str(nc_con)
+        dimnames(nc_con)
+        names(nc_con)
+        groups(nc_con)
+        # dimnames(nc_con)
+        
+        # Create empty NetCDF file
+        nc_out <- create_ncdf()
+        # subgroup <- nc_out$root$create_subgroup("var")
+        
+        # Add all variables
+        for(i in length(names(nc_con))){
+          nc_var_i <- nc_con[[names(nc_con)[i]]]$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
+          # nc_var_i$group
+          nc_out$root$add_variable(nc_var_i)
+          # subgroup$add_variable(nc_var_i)
         }
-        message(paste0(file_name," : ",e$message[1]))
-      })
-      
-      # Unzip if necessary
-      if(file.exists(file_name_full)){
-        if(grepl("bz2", file_name_full)){
-          result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
-          if(length(result) != 0){
-            message("Failed to unzip the file: ", file_name_full)
-          } else {
-            message("File unzipped at: ", gsub(".bz2","",file_name_full))
-            tryCatch({
-              file.remove(file_name_full)
-              message(paste("File removed :", file_name_full))
-            }, error = function(e) {
-              message(paste("Impossible to remove file :", e$message))
-            })
+        nc_out$variables()
+        
+        # Add all attributes
+        for(i in nrow(nc_con$attributes())){
+          nc_out$set_attribute(name = nc_con$attributes()$name[i],
+                               type = nc_con$attributes()$type[i], 
+                               value = nc_con$attributes()$value[i])
+        }
+        # nc_out$attributes <- nc_con$attributes()
+        nc_out$attribute()
+        names(nc_out)
+        nc_out$save(file_name_full)
+        # nc_var <- nc_con[[paste0(dl_var_chunk,"-",dl_correction_chunk,"_mean")]]
+        nc_con <- open_ncdf(url_final)
+        nc_test <- nc_con$clone()
+        nc_test$save(file_name_full)
+
+        nc_test2 <- open_ncdf(file_name_full)
+        peek_ncdf(file_name_full)
+        nc_test2$attributes()
+        nc_test2$var_names
+                
+        str(nc_var)
+        nc_sub <- nc_var$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
+        str(nc_sub)
+        head(nc_sub)
+        
+      } else {
+        # Download
+        tryCatch({
+          curl::curl_download(url_final, destfile = file_name_full)
+          message(paste0("File downloaded at: ",file_name_full))
+        }, error = function(e) {
+          if(grepl("Server denied you to change to the given directory", e$message[1])){
+            e$message <- " not found on server."
+          }
+          message(paste0(file_name," : ",e$message[1]))
+        })
+        
+        # Unzip if necessary
+        if(file.exists(file_name_full)){
+          if(grepl("bz2", file_name_full)){
+            result <- system(paste("bunzip2 -k -f", file_name_full), intern = TRUE, ignore.stderr = FALSE)
+            if(length(result) != 0){
+              message("Failed to unzip the file: ", file_name_full)
+            } else {
+              message("File unzipped at: ", gsub(".bz2","",file_name_full))
+              tryCatch({
+                file.remove(file_name_full)
+                message(paste("File removed :", file_name_full))
+              }, error = function(e) {
+                message(paste("Impossible to remove file :", e$message))
+              })
+            }
           }
         }
       }
@@ -430,13 +513,71 @@ plot_nc <- function(nc_file, bbox = NULL,
     stop("Variable label cannot be inferred from variable name.")
   }
   
-  # Open the NetCDF file
-  nc_data <- nc_open(nc_file)
+  # Open the connection
+  nc_con <- open_ncdf(nc_file)
+  dimnames(nc_con)
+  nc_con$attributes()
   
   # Extract longitude, latitude, and the specified variable
-  lon <- ncvar_get(nc_data, "lon")
+  var <- nc_con[[nc_var_name]]
+  lon <- var[["lon"]]
+  dimnames(var[["lon"]])
   lat <- ncvar_get(nc_data, "lat")
-  var <- ncvar_get(nc_data, nc_var_name)
+  # var <- ncvar_get(nc_data, nc_var_name)
+
+  
+  
+  # Set bounding box if none exists
+  if(is.null(bbox)){
+    bbox <- c(
+      min(lon, na.rm = TRUE),
+      max(lon, na.rm = TRUE),
+      min(lat, na.rm = TRUE),
+      max(lat, na.rm = TRUE)
+    )
+    message(paste("No bounding box provided, using full extent:", paste(round(bbox, 4), collapse = ", ")))
+  }
+  
+  # Reshape data for ggplot
+  var_df <- melt(var)
+  names(var_df) <- c("lon_idx", "lat_idx", "value")
+  var_df$lon <- lon[var_df$lon_idx]
+  var_df$lat <- lat[var_df$lat_idx]
+  
+
+  
+  # Filter df to bounding box
+  var_df_sub <- var_df[var_df$lon >= bbox[1] & var_df$lon <= bbox[2],]
+  var_df_sub <- var_df_sub[var_df_sub$lat > bbox[3] & var_df_sub$lat <= bbox[4], ]
+  var_df_sub <- var_df_sub[!is.na(var_df_sub$value),]
+  
+
+  nc_con$attributes()
+  peek_ncdf(url_final)
+  str(nc_con)
+  dimnames(nc_con)
+  names(nc_con)
+  groups(nc_con)
+  # dimnames(nc_con)
+  nc_out <- create_ncdf()
+  subgroup <- nc_out$root$create_subgroup("var")
+  for(i in length(names(nc_con))){
+    nc_var_i <- nc_con[[names(nc_con)[i]]]$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
+    nc_var_i$group
+    nc_out$add_variable(nc_var_i)
+    # subgroup$add_variable(nc_var_i)
+  }
+  nc_out$save(file_name_full)
+  nc_out$variables()
+  nc_out$append_attribute()
+  names(nc_out)
+  # nc_var <- nc_con[[paste0(dl_var_chunk,"-",dl_correction_chunk,"_mean")]]
+  
+  str(nc_var)
+  nc_sub <- nc_var$subset(X = dl_bbox[1]:dl_bbox[2], Y = dl_bbox[3]:dl_bbox[4])
+  str(nc_sub)
+  head(nc_sub)
+  
   
   # Get time attribute based on file structure
   if(grepl("SPIM-ATL|CHL-ATL", nc_file)){
@@ -463,28 +604,6 @@ plot_nc <- function(nc_file, bbox = NULL,
 
   # Close the NetCDF file
   nc_close(nc_data)
-  
-  # Reshape data for ggplot
-  var_df <- melt(var)
-  names(var_df) <- c("lon_idx", "lat_idx", "value")
-  var_df$lon <- lon[var_df$lon_idx]
-  var_df$lat <- lat[var_df$lat_idx]
-  
-  # Set bounding box if none exists
-  if(is.null(bbox)){
-    bbox <- c(
-      min(lon, na.rm = TRUE),
-      max(lon, na.rm = TRUE),
-      min(lat, na.rm = TRUE),
-      max(lat, na.rm = TRUE)
-    )
-    message(paste("No bounding box provided, using full extent:", paste(round(bbox, 4), collapse = ", ")))
-  }
-  
-  # Filter df to bounding box
-  var_df_sub <- var_df[var_df$lon >= bbox[1] & var_df$lon <= bbox[2],]
-  var_df_sub <- var_df_sub[var_df_sub$lat > bbox[3] & var_df_sub$lat <= bbox[4], ]
-  var_df_sub <- var_df_sub[!is.na(var_df_sub$value),]
   
   # Set plot name
   plot_name <- file.path(output_dir, paste0(nc_var_name,"_",plot_date,".png"))
@@ -525,12 +644,15 @@ plot_nc <- function(nc_file, bbox = NULL,
 # download_nc() will attempt to pick the correct sensors etc based on the requested variable and dates
 # Possible variables: SPM, CHLA, CDOM, RRS, TUR, SST
 
+# TODO: List all of the possible values that can be passed to all arguments in the functions
+# Also create a table with the available dates of data
+
 # Download a few days of SPM data
 # NB: If no product is chosen, CHL and SPM default to SEXTANT
 download_nc(
   dl_var = "SPM",
   dl_dates = c("2025-09-01", "2025-09-05"),
-  output_dir = "~/Downloads", # Change as desired/required
+  output_dir = "~/Downloads/SEXTANT", # Change as desired/required
   overwrite = FALSE # Change to TRUE to force downloads
 )
 
@@ -543,13 +665,14 @@ download_nc(
   overwrite = FALSE # Change to TRUE to force downloads
 )
 
-# Download one day of SPM data from MODIS
+# Download one day of SPM data from MODIS for a given bounding box
 download_nc(
   dl_var = "SPM",
   dl_dates = c("2008-12-25"),
   dl_product = "ODATIS-MR",
   dl_sensor = "MODIS",
-  output_dir = "~/Downloads", # Change as desired/required
+  dl_bbox = c(7, 8, 43, 45),
+  output_dir = "~/Downloads/MODIS", # Change as desired/required
   overwrite = FALSE # Change to TRUE to force downloads
 )
 
