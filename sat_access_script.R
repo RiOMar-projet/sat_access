@@ -116,6 +116,7 @@ download_nc <- function(dl_var, dl_dates,
   
   # Get sensors and corrections for ODATIS-MR data products
   # TODO: Add a logic gate that checks the extent given versus what is available in ODATIS-MR
+  # c(-7.8, 10.3, 41.2, 51.5) # The ODATIS-MR extent
   if(dl_product == "ODATIS-MR"){
     
     if(is.null(dl_bbox)){
@@ -400,42 +401,38 @@ download_nc <- function(dl_var, dl_dates,
         lonlat_start <- c(min(lon_indices), min(lat_indices))  # Assuming time is the third dimension
         lonlat_count <- c(length(lon_indices), length(lat_indices))  # -1 means read all along this dimension
         
-        # Get variable names
-        # names(nc_data$var)
-        
-        # Load only the desired subset of the variable into memory
-        var_subset <- ncvar_get(nc_data, names(nc_data$var)[1], 
-                                start = lonlat_start, count = lonlat_count)
+        # Define the lon/lat dimensions
+        lon_dim <- ncdim_def(name = "lon", units = "degrees_east", vals = lon_subset)
+        lat_dim <- ncdim_def(name = "lat", units = "degrees_north", vals = lat_subset)
         
         # Get global attributes from the original file
         global_attrs <- ncatt_get(nc_data, varid = 0)
         
+        # Initialize empty lists
+        var_data_list <- list()
+        var_def_list <- list()
+        
+        # Loop to assign values and definitions
+        for (i in 1:length(names(nc_data$var))) {
+          var_info_i <- nc_data$var[i][[1]]
+          var_data_list[[paste0("var_data_", i)]] <- ncvar_get(nc = nc_data, varid = var_info_i$name, 
+                                                               start = lonlat_start, count = lonlat_count)
+          var_def_list[[paste0("var_def_", i)]] <- ncvar_def(name = var_info_i$name, units = var_info_i$units,
+                                                             dim = list(lon = lon_dim, lat = lat_dim),
+                                                             prec = var_info_i$prec, missval = var_info_i$missval, 
+                                                             longname = var_info_i$longname)
+        }; rm(i, var_info_i)
+
         # Close the NetCDF file
         nc_close(nc_data)
         
-        # Define the lon/lat dimensions
-        # lon_dim <- ncdim_def(name = "lon", "double", lon_indices, missval = NA, longname = "Longitude", units = "degrees_east")
-        # ncdim_def("lat", "double", lat_indices, missval = NA, longname = "Latitude", units = "degrees_north")
-        lon_dim <- ncdim_def(name = "lon", units = "degrees_east", vals = lon_subset)
-        lat_dim <- ncdim_def(name = "lat", units = "degrees_north", vals = lat_subset)
-        
-        # Define the variable to be put into the NetCDF file
-        var_1_info <- nc_data$var[1]$`SPM-G-NS_mean`
-        var_1 <- ncvar_def(name = var_1_info$name, units = var_1_info$units,
-                           dim = list(lon = lon_dim, lat = lat_dim),
-                           prec = var_1_info$prec, missval = NA, longname = var_1_info$longname)
-        # ncvar_def(output_nc_data, "time", "double", 0, missval = NA, longname = "Time", units = "days since 1900-01-01")
-        
-        # Define the variable in the new NetCDF file
-        
         # Create a new NetCDF file for the subset
-        # output_nc_data <- nc_create(file_name_full,
-        #                             list(var = list(dim = list(lon = length(lon_indices), lat = length(lat_indices)),
-        #                                             var.dim = list(lon = lon_indices, lat = lat_indices))))
-        output_nc_data <- nc_create(file_name_full, vars = list(var_1), force_v4 = TRUE)
+        output_nc_data <- nc_create(file_name_full, vars = var_def_list, force_v4 = TRUE)
         
         # Add the data
-        ncvar_put(nc = output_nc_data, varid = var_1, vals = var_subset)
+        for (i in 1:length(var_def_list)) {
+          ncvar_put(nc = output_nc_data, varid = var_def_list[[i]], vals = var_data_list[[i]])
+        }; rm(i)
         
         # Additional attributes
         # ncatt_put(output_nc_data, "lon", "axis", "X")
@@ -454,11 +451,15 @@ download_nc <- function(dl_var, dl_dates,
           ncatt_put(output_nc_data, 0, attr, global_attrs[[attr]])
         }
         
-        # End the definition mode
-        # nc_close(output_nc_data)
-        
-        # Reopen the new NetCDF file in write mode to add data
-        # output_nc_data <- nc_open(output_nc_file_path, write = TRUE)
+        # Update lon/lat global attributes
+        # test1 <- ncdf4::ncatt_get(output_nc_data, varid = 0)
+        ncatt_put(output_nc_data, varid = 0, attname = "northernmost_latitude", attval = max(lat_subset), definemode = TRUE)
+        ncatt_put(output_nc_data, varid = 0, attname = "southernmost_latitude", attval = min(lat_subset), definemode = TRUE)
+        ncatt_put(output_nc_data, varid = 0, attname = "easternmost_longitude", attval = max(lon_subset), definemode = TRUE)
+        ncatt_put(output_nc_data, varid = 0, attname = "westernmost_longitude", attval = min(lon_subset), definemode = TRUE)
+        ncatt_put(output_nc_data, varid = 0, attname = "spatial_subset", definemode = TRUE,
+                  attval = paste("Spatially subset on", Sys.Date(), "by", 
+                                 "https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script.R"))
         
         # Write the subset data to the new NetCDF file
         # ncvar_put(output_nc_data, "longitude", lon[lon_indices])
@@ -661,10 +662,14 @@ plot_nc <- function(nc_file, bbox = NULL,
 ## Downloading ------------------------------------------------------------
 
 # download_nc() will attempt to pick the correct sensors etc based on the requested variable and dates
-# Possible variables: SPM, CHLA, CDOM, RRS, TUR, SST
 
-# TODO: List all of the possible values that can be passed to all arguments in the functions
-# Also create a table with the available dates of data
+# NB: It is only necessary to give the function a value for 'dl_var', it will figure out the rest
+# But if you want a specific product etc., these are the options
+## Possible values for 'dl_var' : "SPM", "CHL", "CDOM", "RRS", "T", "SST" 
+## Possible values for 'dl_product' : "SEXTANT", "ODATIS-MR"
+## Possible values for 'dl_sensor' : "MODIS", "MERIS", "OLCI-A", "OLCI-B"
+## Possible values for 'dl_correction' : "polymer", "nirswir" 
+## Possible values for 'dl_time_step' : "day", "8-day", "month"
 
 # Download a few days of SPM data
 # NB: If no product is chosen, CHL and SPM default to SEXTANT
@@ -782,7 +787,7 @@ download_nc(
 # Plot an SPM NetCDF file
 plot_nc(
   nc_file = "~/Downloads/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc", 
-  bbox = c(3, 8, 41, 44), 
+  bbox = c(3, 4, 42.5, 44),
   plot_width = 5, 
   plot_height = 5, 
   output_dir = "~/Downloads"
