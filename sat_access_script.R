@@ -673,110 +673,110 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Download a few days of SPM data
 # NB: If no product is chosen, CHL and SPM default to SEXTANT
-download_nc(
-  dl_var = "SPM",
-  dl_dates = c("2025-09-01", "2025-09-05"),
-  output_dir = "~/Downloads/SEXTANT", # Change as desired/required
-  overwrite = FALSE # Change to TRUE to force downloads
-)
-
+# download_nc(
+#   dl_var = "SPM",
+#   dl_dates = c("2025-09-01", "2025-09-05"),
+#   output_dir = "~/Downloads/SEXTANT", # Change as desired/required
+#   overwrite = FALSE # Change to TRUE to force downloads
+# )
+ 
 # Download a few days of CHL data
 # NB: If no product is chosen, CHL and SPM default to SEXTANT
-download_nc(
-  dl_var = "CHL",
-  dl_dates = c("2025-09-01", "2025-09-05"),
-  output_dir = "~/Downloads", # Change as desired/required
-  overwrite = FALSE # Change to TRUE to force downloads
-)
-
+# download_nc(
+#   dl_var = "CHL",
+#   dl_dates = c("2025-09-01", "2025-09-05"),
+#   output_dir = "~/Downloads", # Change as desired/required
+#   overwrite = FALSE # Change to TRUE to force downloads
+# )
+ 
 # Download one day of SPM data from MODIS for a given bounding box
-download_nc(
-  dl_var = "SPM",
-  dl_dates = c("2008-12-25"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "MODIS",
-  dl_bbox = c(3, 4, 42.5, 44),
-  output_dir = "~/Downloads/MODIS", # Change as desired/required
-  overwrite = TRUE # Change to TRUE to force downloads
-)
-
+# download_nc(
+#   dl_var = "SPM",
+#   dl_dates = c("2008-12-25"),
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "MODIS",
+#   dl_bbox = c(3, 4, 42.5, 44),
+#   output_dir = "~/Downloads/MODIS", # Change as desired/required
+#   overwrite = TRUE # Change to TRUE to force downloads
+# )
+ 
 # Download one day of Chl a data from MERIS
-download_nc(
-  dl_var = "CHL",
-  dl_dates = c("2008-12-25"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "MERIS",
-  output_dir = "~/Downloads", # Change as desired/required
-  overwrite = FALSE # Change to TRUE to force downloads
-)
-
+# download_nc(
+#   dl_var = "CHL",
+#   dl_dates = c("2008-12-25"),
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "MERIS",
+#   output_dir = "~/Downloads", # Change as desired/required
+#   overwrite = FALSE # Change to TRUE to force downloads
+# )
+ 
 # Download a few days of CDOM data
-download_nc(
-  dl_var = "CDOM",
-  dl_dates = c("2022-09-01", "2022-09-05"),
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "CDOM",
+#   dl_dates = c("2022-09-01", "2022-09-05"),
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download one day of SST data
-download_nc(
-  dl_var = "SST",
-  dl_dates = "2014-01-01",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "SST",
+#   dl_dates = "2014-01-01",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download one day of turbidity data from OLCI-B
-download_nc(
-  dl_var = "T",
-  dl_dates = "2019-01-01",
-  dl_product = "ODATIS-MR",
-  dl_sensor = "OLCI-B",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "T",
+#   dl_dates = "2019-01-01",
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "OLCI-B",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download RRS data from MODIS (W_nm 555)
-download_nc(
-  dl_var = "RRS",
-  dl_dates = "2019-01-01",
-  dl_product = "ODATIS-MR",
-  dl_sensor = "MODIS",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "RRS",
+#   dl_dates = "2019-01-01",
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "MODIS",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download RRS data from OLCI-A (W_nm 560)
-download_nc(
-  dl_var = "RRS",
-  dl_dates = "2019-01-01",
-  dl_product = "ODATIS-MR",
-  dl_sensor = "OLCI-A",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "RRS",
+#   dl_dates = "2019-01-01",
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "OLCI-A",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download a few 8-day averages of Chl a data
-download_nc(
-  dl_var = "CHL",
-  dl_dates = c("2018-12-01", "2019-01-25"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "OLCI-A",
-  dl_time_step = "8-day",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
-
+# download_nc(
+#   dl_var = "CHL",
+#   dl_dates = c("2018-12-01", "2019-01-25"),
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "OLCI-A",
+#   dl_time_step = "8-day",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
+ 
 # Download a few months of Turbidity data from OLCI-A
-download_nc(
-  dl_var = "T",
-  dl_dates = c("2019-01-01", "2019-03-01"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "OLCI-A",
-  dl_time_step = "month",
-  output_dir = "~/Downloads",
-  overwrite = FALSE
-)
+# download_nc(
+#   dl_var = "T",
+#   dl_dates = c("2019-01-01", "2019-03-01"),
+#   dl_product = "ODATIS-MR",
+#   dl_sensor = "OLCI-A",
+#   dl_time_step = "month",
+#   output_dir = "~/Downloads",
+#   overwrite = FALSE
+# )
 
 
 ## Plotting ---------------------------------------------------------------
@@ -785,82 +785,82 @@ download_nc(
 # Note that it is only designed to work with files downloaded via download_nc()
 
 # Plot an SPM NetCDF file
-plot_nc(
-  nc_file = "~/Downloads/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc", 
-  bbox = c(3, 4, 42.5, 44),
-  plot_width = 5, 
-  plot_height = 5, 
-  output_dir = "~/Downloads"
-)
-
+# plot_nc(
+#   nc_file = "~/Downloads/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc", 
+#   bbox = c(3, 4, 42.5, 44),
+#   plot_width = 5, 
+#   plot_height = 5, 
+#   output_dir = "~/Downloads"
+# )
+ 
 # Plot a Chl a NetCDF file
-plot_nc(
-  nc_file = "~/Downloads/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc", 
-  bbox = c(-3.5, -0.5, 44, 48), 
-  plot_width = 5, 
-  plot_height = 9, 
-  output_dir = "~/Downloads"
-)
-
+# plot_nc(
+#   nc_file = "~/Downloads/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc", 
+#   bbox = c(-3.5, -0.5, 44, 48), 
+#   plot_width = 5, 
+#   plot_height = 9, 
+#   output_dir = "~/Downloads"
+# )
+ 
 # Plot a CDOM NetCDF file
-# NB: Providing no 'bbox' argument will plot the full extent of the data in the file
-plot_nc(
-  nc_file = "~/Downloads/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc", 
-  plot_width = 7, 
-  plot_height = 6, 
-  output_dir = "~/Downloads"
-)
+# # NB: Providing no 'bbox' argument will plot the full extent of the data in the file
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc", 
+#   plot_width = 7, 
+#   plot_height = 6, 
+#   output_dir = "~/Downloads"
+# )
 
 # Plot an SST NetCDF file
-plot_nc(
-  nc_file = "~/Downloads/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
-  bbox = c(-5, 10, 40, 55), 
-  plot_width = 8, 
-  plot_height = 6, 
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
+#   bbox = c(-5, 10, 40, 55), 
+#   plot_width = 8, 
+#   plot_height = 6, 
+#   output_dir = "~/Downloads"
+# )
 
 # Plot a turbidity NetCDF file
-plot_nc(
-  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
-  bbox = c(2, 6, 41, 44),
-  plot_width = 6,
-  plot_height = 5,
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
+#   bbox = c(2, 6, 41, 44),
+#   plot_width = 6,
+#   plot_height = 5,
+#   output_dir = "~/Downloads"
+# )
 
 # Plot an RRS NetCDF file from MODIS
-plot_nc(
-  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
-  bbox = c(2, 5, 41, 45),
-  plot_width = 7,
-  plot_height = 6,
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
+#   bbox = c(2, 5, 41, 45),
+#   plot_width = 7,
+#   plot_height = 6,
+#   output_dir = "~/Downloads"
+# )
 
 # Plot an RRS NetCDF file from OLCI-A
-plot_nc(
-  nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
-  plot_width = 7,
-  plot_height = 6,
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
+#   plot_width = 7,
+#   plot_height = 6,
+#   output_dir = "~/Downloads"
+# )
 
 # Plot an 8-day average of Chl a data
-plot_nc(
-  nc_file = "~/Downloads/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
-  # bbox = c(2, 6, 41, 44),
-  plot_width = 5,
-  plot_height = 5,
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
+#   # bbox = c(2, 6, 41, 44),
+#   plot_width = 5,
+#   plot_height = 5,
+#   output_dir = "~/Downloads"
+# )
 
 # Plot one month of turbidity data
-plot_nc(
-  nc_file = "~/Downloads/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
-  # bbox = c(2, 6, 41, 44),
-  plot_width = 5,
-  plot_height = 5,
-  output_dir = "~/Downloads"
-)
+# plot_nc(
+#   nc_file = "~/Downloads/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
+#   # bbox = c(2, 6, 41, 44),
+#   plot_width = 5,
+#   plot_height = 5,
+#   output_dir = "~/Downloads"
+# )
 
