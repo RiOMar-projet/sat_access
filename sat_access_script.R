@@ -265,10 +265,10 @@ download_nc <- function(dl_var, dl_dates,
       
       # Base URL
       if(is.null(dl_bbox)){
-        url_base <- paste0("https://",username,";",password,
+        url_base <- paste0("https://",username,":",password,
                            "@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
       } else {
-        url_base <- paste0("https://",username,";",password,
+        url_base <- paste0("https://",username,":",password,
                            "@tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
       }
       
@@ -703,8 +703,8 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "MODIS",
 #   dl_bbox = c(3, 4, 42.5, 44),
-#   username = "your_username", # Change to your ODATIS-MR username
-#   password = "your_password", # Change to your ODATIS-MR password
+#   username = "", # Change to your ODATIS-MR username
+#   password = "", # Change to your ODATIS-MR password
 #   output_dir = "~/Downloads/MODIS", # Change as desired/required
 #   overwrite = TRUE # Change to TRUE to force downloads
 # )
