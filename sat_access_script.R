@@ -15,8 +15,8 @@
 # ODATIS-MR URL interface :
 # https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/catalog.html
 
-# rschlegel
-# MuDMxqHn6p9p
+# Note that it is now necessary to access the ODATIS MR data with an AVISO+ account:
+# https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html
 
 # Libraries ---------------------------------------------------------------
 
@@ -38,6 +38,7 @@ library(ggplot2)   # For visualization
 download_nc <- function(dl_var, dl_dates, 
                         dl_product = NULL, dl_sensor = NULL, 
                         dl_correction = NULL, dl_time_step = NULL, dl_bbox = NULL,
+                        username = NULL, password = NULL,
                         output_dir, overwrite) {
   
   # Check date range
@@ -118,6 +119,10 @@ download_nc <- function(dl_var, dl_dates,
   # TODO: Add a logic gate that checks the extent given versus what is available in ODATIS-MR
   # c(-7.8, 10.3, 41.2, 51.5) # The ODATIS-MR extent
   if(dl_product == "ODATIS-MR"){
+    
+    if(is.null(username) | is.null(password)){
+      stop("ODATIS-MR data products require an AVISO+ account. Please provide your username and password via the 'username' and 'password' arguments.")
+    }
     
     if(is.null(dl_bbox)){
       message("No bounding box provided, data will be downloaded for the full extent of the product.")
@@ -260,9 +265,11 @@ download_nc <- function(dl_var, dl_dates,
       
       # Base URL
       if(is.null(dl_bbox)){
-        url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+        url_base <- paste0("https://",username,";",password,
+                           "@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
       } else {
-        url_base <- "https://tds%40odatis-ocean.fr:odatis@tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+        url_base <- paste0("https://",username,";",password,
+                           "@tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
       }
       
       # Prep sensor strings
@@ -696,6 +703,8 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "MODIS",
 #   dl_bbox = c(3, 4, 42.5, 44),
+#   username = "your_username", # Change to your ODATIS-MR username
+#   password = "your_password", # Change to your ODATIS-MR password
 #   output_dir = "~/Downloads/MODIS", # Change as desired/required
 #   overwrite = TRUE # Change to TRUE to force downloads
 # )
