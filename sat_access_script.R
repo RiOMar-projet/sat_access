@@ -2,21 +2,22 @@
 
 # Title: Satellite Data Access and Visualization Script
 # Author: Robert Schlegel
-# Date: January 2026
-# Description: This script contains functions that can be used to
-#              download SPM or chlorophyll-a NetCDF files from a specified URL
-#              for given date ranges and plot the data.
-#              The products available via this script are SEXTANT and all files
-#              available on the Acri-ST ftp server for ODATIS products.
+# Date: February 2026
+# Description: This script contains functions that can be used to download and plot 
+#              ocean colour NetCDF files for given date ranges and bounding boxes.
+#              The products available via this script are SEXTANT and ODATIS MR.
 
-# Useful documentation:
+## Useful documentation:
+
 # ODATIS-MR user guide (en français) :
 # https://www.aviso.altimetry.fr/fileadmin/documents/data/tools/hdbk_ODATIS_MR.pdf
+
 # ODATIS-MR URL interface :
 # https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/catalog.html
 
 # Note that it is now necessary to access the ODATIS MR data with an AVISO+ account:
 # https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html
+
 
 # Libraries ---------------------------------------------------------------
 
@@ -33,13 +34,27 @@ library(reshape2)  # For data reshaping
 library(ggplot2)   # For visualization
 
 
+# Login credentials -------------------------------------------------------
+
+# NB: It is best practice to never write one's username/password in a script.
+# Rather one should save them in a file and load them into the environment.
+# Change the file pathway according to how you've saved your credentials:
+aviso_plus_cred <- read.csv("~/pCloudDrive/Documents/info/aviso_plus_pswd.csv")
+
+
 # The download function ---------------------------------------------------
 
-download_nc <- function(dl_var, dl_dates, 
-                        dl_product = NULL, dl_sensor = NULL, 
-                        dl_correction = NULL, dl_time_step = NULL, dl_bbox = NULL,
-                        username = NULL, password = NULL,
-                        output_dir, overwrite) {
+download_nc <- function(dl_var, 
+                        dl_dates, 
+                        dl_product = NULL, 
+                        dl_correction = NULL, 
+                        dl_sensor = NULL,
+                        dl_time_step = NULL, 
+                        dl_bbox = NULL,
+                        username = NULL, 
+                        password = NULL,
+                        output_dir, 
+                        overwrite = FALSE) {
   
   # Check date range
   if(length(dl_dates) > 2){
@@ -116,16 +131,22 @@ download_nc <- function(dl_var, dl_dates,
   }
   
   # Get sensors and corrections for ODATIS-MR data products
-  # TODO: Add a logic gate that checks the extent given versus what is available in ODATIS-MR
-  # c(-7.8, 10.3, 41.2, 51.5) # The ODATIS-MR extent
   if(dl_product == "ODATIS-MR"){
     
     if(is.null(username) | is.null(password)){
-      stop("ODATIS-MR data products require an AVISO+ account. Please provide your username and password via the 'username' and 'password' arguments.")
+      message("ODATIS-MR data products require an AVISO+ account.\n",
+              "Please provide your username and password via the 'username' and 'password' arguments.\n",
+              "One may register for a free account here:\n",
+              "https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html")
+      return()
     }
     
     if(is.null(dl_bbox)){
       message("No bounding box provided, data will be downloaded for the full extent of the product.")
+    } else if(dl_bbox[1] < -7.8 | dl_bbox[2] > 10.3 | dl_bbox[3] < 41.2 | dl_bbox[4] > 51.5){
+      message("The bounding box provided exceeds the extent of the ODATIS-MR data product :/n", 
+              "lon: -7.8 to 10.3, lat: 41.2 to 51.5\n",
+              "Data will be downloadeded up to these limits.")
     } else {
       message(paste("Bounding box provided, data will be downloaded from longitude ",
                     dl_bbox[1]," to ",dl_bbox[2]," and latitude ",dl_bbox[3]," to ",dl_bbox[4],".", sep = ""))
@@ -196,16 +217,16 @@ download_nc <- function(dl_var, dl_dates,
     ceiling_date_sensor <- as.Date(Sys.Date())-7
   } else if(dl_sensor == "MODIS"){
     floor_date_sensor <- as.Date("2002-07-04")
-    ceiling_date_sensor <- as.Date("2023-12-31")
+    ceiling_date_sensor <- as.Date("2024-12-31")
   } else if(dl_sensor == "MERIS"){
     floor_date_sensor <- as.Date("2002-06-19")
     ceiling_date_sensor <- as.Date("2012-04-08")
   } else if(dl_sensor == "OLCI-A"){
     floor_date_sensor <- as.Date("2016-04-26")
-    ceiling_date_sensor <- as.Date("2023-12-31")
+    ceiling_date_sensor <- as.Date("2024-12-31")
   } else if(dl_sensor == "OLCI-B"){
     floor_date_sensor <- as.Date("2018-05-15")
-    ceiling_date_sensor <- as.Date("2023-12-31")
+    ceiling_date_sensor <- as.Date("2024-12-31")
   }
   
   # Check chosen dates against chosen data product, sensor, and correction
@@ -263,14 +284,19 @@ download_nc <- function(dl_var, dl_dates,
     # Get URL specifics for ODATIS-MR
     } else if(toupper(dl_product) == "ODATIS-MR"){
       
+      # Correct @ in password
+      username_fix <- gsub("@", "%40", username)
+      password_fix <- gsub("@", "%40", password)
+      
       # Base URL
       if(is.null(dl_bbox)){
-        url_base <- paste0("https://",username,":",password,
-                           "@tds-odatis.aviso.altimetry.fr/thredds/fileServer/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
+        access_type <- "fileServer"
       } else {
-        url_base <- paste0("https://",username,":",password,
-                           "@tds-odatis.aviso.altimetry.fr/thredds/dodsC/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
+        access_type <- "dodsC"
       }
+      url_base <- paste0("https://",username_fix,":",password_fix,
+                         "@tds-odatis.aviso.altimetry.fr/thredds/",access_type,
+                         "/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE")
       
       # Prep sensor strings
       dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
@@ -335,7 +361,7 @@ download_nc <- function(dl_var, dl_dates,
         current_date <- dl_date
         
         # Double check that the product ceiling date has not been surpassed and correct accordingly
-        # Note that the last file for every year in the ODATIS-MR product catalog is not 8 days of data
+        # Note that the last file for every year in the ODATIS-MR product catalogue is not 8 days of data
         # It is whatever the start date is, up to the last date of the year, or the last date of the product itself
         if(year(dl_date+7) > year(dl_date)){
           dl_date_flat <- paste0(format(dl_date, "%Y%m%d"), "-", format(as.Date(paste(dl_year, 12, 31, sep = "/")), "%Y%m%d"))
@@ -354,7 +380,6 @@ download_nc <- function(dl_var, dl_dates,
       # Product URL
       url_product <- paste(dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, dl_day, sep = "/")
       file_name <- paste0("L3m_",dl_date_flat,"__FRANCE_03_",dl_sensor_chunk,"_",dl_var_chunk,"-",dl_correction_chunk,"_",dl_time_step_chunk,"_00.nc")
-      # nc_file <- file.path(output_dir, file_name)
       
     } else {
       stop("Please check the value used for 'dl_product'")
@@ -441,25 +466,12 @@ download_nc <- function(dl_var, dl_dates,
           ncvar_put(nc = output_nc_data, varid = var_def_list[[i]], vals = var_data_list[[i]])
         }; rm(i)
         
-        # Additional attributes
-        # ncatt_put(output_nc_data, "lon", "axis", "X")
-        # ncatt_put(output_nc_data, "lat", "axis", "Y")
-        
-        # Define dimensions in the new NetCDF file
-        # ncvar_def(output_nc_data, "lon", "double", lon_indices, missval = NA, longname = "Longitude", units = "degrees_east")
-        # ncvar_def(output_nc_data, "lat", "double", lat_indices, missval = NA, longname = "Latitude", units = "degrees_north")
-        # ncvar_def(output_nc_data, "time", "double", 0, missval = NA, longname = "Time", units = "days since 1900-01-01")
-        
-        # Define the variable in the new NetCDF file
-        # ncvar_def(output_nc_data, var_name, "double", list(lon = lon_indices, lat = lat_indices), missval = NA)
-        
         # Copy global attributes to the new file
         for (attr in names(global_attrs)) {
           ncatt_put(output_nc_data, 0, attr, global_attrs[[attr]])
         }
         
         # Update lon/lat global attributes
-        # test1 <- ncdf4::ncatt_get(output_nc_data, varid = 0)
         ncatt_put(output_nc_data, varid = 0, attname = "northernmost_latitude", attval = max(lat_subset), definemode = TRUE)
         ncatt_put(output_nc_data, varid = 0, attname = "southernmost_latitude", attval = min(lat_subset), definemode = TRUE)
         ncatt_put(output_nc_data, varid = 0, attname = "easternmost_longitude", attval = max(lon_subset), definemode = TRUE)
@@ -468,12 +480,7 @@ download_nc <- function(dl_var, dl_dates,
                   attval = paste("Spatially subset on", Sys.Date(), "by", 
                                  "https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script.R"))
         
-        # Write the subset data to the new NetCDF file
-        # ncvar_put(output_nc_data, "longitude", lon[lon_indices])
-        # ncvar_put(output_nc_data, "latitude", lat[lat_indices])
-        # ncvar_put(output_nc_data, var_name, var_subset)
-        
-        # Close the new NetCDF file
+        # Close the new NetCDF file to write to disk
         nc_close(output_nc_data)
         
         # Print a message indicating the process is complete
@@ -541,6 +548,7 @@ plot_nc <- function(nc_file, bbox = NULL,
   
   # Get the relevant snippet from the file
   file_snippets <- unlist(strsplit(basename(nc_file), "_"))
+  
   # SEXTANT files
   if(length(file_snippets) == 1){
     if(grepl("SPIM-ATL", nc_file)){
@@ -550,6 +558,7 @@ plot_nc <- function(nc_file, bbox = NULL,
     } else {
       stop("File structure cannot be inferred from file name. Please ensure the file was downloaded via the function found in this script.")
     }
+    
   # ODATIS-MR files
   } else if(length(file_snippets) == 9){
     nc_var_name <- paste0(file_snippets[7],"_mean")
@@ -683,7 +692,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 # download_nc(
 #   dl_var = "SPM",
 #   dl_dates = c("2025-09-01", "2025-09-05"),
-#   output_dir = "~/Downloads/SEXTANT", # Change as desired/required
+#   output_dir = "~/data/SEXTANT", # Change as desired
 #   overwrite = FALSE # Change to TRUE to force downloads
 # )
  
@@ -692,8 +701,8 @@ plot_nc <- function(nc_file, bbox = NULL,
 # download_nc(
 #   dl_var = "CHL",
 #   dl_dates = c("2025-09-01", "2025-09-05"),
-#   output_dir = "~/Downloads", # Change as desired/required
-#   overwrite = FALSE # Change to TRUE to force downloads
+#   output_dir = "~/data/SEXTANT",
+#   overwrite = FALSE
 # )
  
 # Download one day of SPM data from MODIS for a given bounding box
@@ -703,10 +712,10 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "MODIS",
 #   dl_bbox = c(3, 4, 42.5, 44),
-#   username = "", # Change to your ODATIS-MR username
-#   password = "", # Change to your ODATIS-MR password
-#   output_dir = "~/Downloads/MODIS", # Change as desired/required
-#   overwrite = TRUE # Change to TRUE to force downloads
+#   username = aviso_plus_cred$usrname, # Change to match how you've loaded your username
+#   password = aviso_plus_cred$psswrd, # Change to match how you've loaded your password
+#   output_dir = "~/data/MODIS", # Change as desired/required
+#   overwrite = TRUE
 # )
  
 # Download one day of Chl a data from MERIS
@@ -715,23 +724,31 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_dates = c("2008-12-25"),
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "MERIS",
-#   output_dir = "~/Downloads", # Change as desired/required
-#   overwrite = FALSE # Change to TRUE to force downloads
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/MERIS",
+#   overwrite = FALSE
 # )
  
 # Download a few days of CDOM data
+# NB: If not specified, the default sensor for ODATIS MR is OLCI-A
 # download_nc(
 #   dl_var = "CDOM",
-#   dl_dates = c("2022-09-01", "2022-09-05"),
-#   output_dir = "~/Downloads",
+#   dl_dates = c("2024-09-01", "2024-09-05"),
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/OLCI-A",
 #   overwrite = FALSE
 # )
  
 # Download one day of SST data
+# NB: The default sensor for SST is MODIS
 # download_nc(
 #   dl_var = "SST",
 #   dl_dates = "2014-01-01",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/MODIS",
 #   overwrite = FALSE
 # )
  
@@ -741,7 +758,9 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_dates = "2019-01-01",
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "OLCI-B",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/OLCI-B",
 #   overwrite = FALSE
 # )
  
@@ -751,7 +770,9 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_dates = "2019-01-01",
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "MODIS",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/MODIS",
 #   overwrite = FALSE
 # )
  
@@ -761,29 +782,35 @@ plot_nc <- function(nc_file, bbox = NULL,
 #   dl_dates = "2019-01-01",
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "OLCI-A",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/OLCI-A",
 #   overwrite = FALSE
 # )
  
-# Download a few 8-day averages of Chl a data
+# Download a few 8-day averages of Chl a data for the full extent of France
 # download_nc(
 #   dl_var = "CHL",
-#   dl_dates = c("2018-12-01", "2019-01-25"),
+#   dl_dates = c("2019-01-01", "2019-01-25"),
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "OLCI-A",
 #   dl_time_step = "8-day",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/OLCI-A",
 #   overwrite = FALSE
 # )
  
-# Download a few months of Turbidity data from OLCI-A
+# Download a three months of Turbidity data from OLCI-A
 # download_nc(
 #   dl_var = "T",
 #   dl_dates = c("2019-01-01", "2019-03-01"),
 #   dl_product = "ODATIS-MR",
 #   dl_sensor = "OLCI-A",
 #   dl_time_step = "month",
-#   output_dir = "~/Downloads",
+#   username = aviso_plus_cred$usrname,
+#   password = aviso_plus_cred$psswrd,
+#   output_dir = "~/data/OLCI-A",
 #   overwrite = FALSE
 # )
 
@@ -792,19 +819,20 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # NB: plot_nc() will automagically detect the necessary .nc structure and variable from the file name
 # Note that it is only designed to work with files downloaded via download_nc()
+# This means it should work with the file structure for all SEXTANT and ODATIS MR products
 
 # Plot an SPM NetCDF file
 # plot_nc(
-#   nc_file = "~/Downloads/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc", 
+#   nc_file = "~/data/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc",
 #   bbox = c(3, 4, 42.5, 44),
-#   plot_width = 5, 
-#   plot_height = 5, 
+#   plot_width = 5,
+#   plot_height = 10,
 #   output_dir = "~/Downloads"
 # )
  
 # Plot a Chl a NetCDF file
 # plot_nc(
-#   nc_file = "~/Downloads/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc", 
+#   nc_file = "~/data/SEXTANT/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc", 
 #   bbox = c(-3.5, -0.5, 44, 48), 
 #   plot_width = 5, 
 #   plot_height = 9, 
@@ -814,7 +842,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 # Plot a CDOM NetCDF file
 # # NB: Providing no 'bbox' argument will plot the full extent of the data in the file
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc", 
+#   nc_file = "~/data/OLCI-A/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc", 
 #   plot_width = 7, 
 #   plot_height = 6, 
 #   output_dir = "~/Downloads"
@@ -822,7 +850,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot an SST NetCDF file
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
+#   nc_file = "~/data/MODIS/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
 #   bbox = c(-5, 10, 40, 55), 
 #   plot_width = 8, 
 #   plot_height = 6, 
@@ -831,7 +859,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot a turbidity NetCDF file
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
+#   nc_file = "~/data/OLCI-B/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
 #   bbox = c(2, 6, 41, 44),
 #   plot_width = 6,
 #   plot_height = 5,
@@ -840,7 +868,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot an RRS NetCDF file from MODIS
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
+#   nc_file = "~/data/MODIS/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
 #   bbox = c(2, 5, 41, 45),
 #   plot_width = 7,
 #   plot_height = 6,
@@ -849,7 +877,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot an RRS NetCDF file from OLCI-A
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
+#   nc_file = "~/data/OLCI-A/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
 #   plot_width = 7,
 #   plot_height = 6,
 #   output_dir = "~/Downloads"
@@ -857,7 +885,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot an 8-day average of Chl a data
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
+#   nc_file = "~/data/OLCI-A/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
 #   # bbox = c(2, 6, 41, 44),
 #   plot_width = 5,
 #   plot_height = 5,
@@ -866,7 +894,7 @@ plot_nc <- function(nc_file, bbox = NULL,
 
 # Plot one month of turbidity data
 # plot_nc(
-#   nc_file = "~/Downloads/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
+#   nc_file = "~/data/OLCI-A/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
 #   # bbox = c(2, 6, 41, 44),
 #   plot_width = 5,
 #   plot_height = 5,
