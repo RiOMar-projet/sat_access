@@ -414,7 +414,7 @@ download_nc <- function(dl_var,
       if(!is.null(dl_bbox) & dl_product == "ODATIS-MR"){
         
         # Open the connection
-        nc_data <- nc_open(url_final)
+        tryCatch({ nc_data <- nc_open(url_final)
         # names(nc_data)
         
         # Extract the longitude and latitude variables
@@ -454,7 +454,7 @@ download_nc <- function(dl_var,
                                                              prec = var_info_i$prec, missval = var_info_i$missval, 
                                                              longname = var_info_i$longname)
         }; rm(i, var_info_i)
-
+        
         # Close the NetCDF file
         nc_close(nc_data)
         
@@ -486,8 +486,13 @@ download_nc <- function(dl_var,
         # Print a message indicating the process is complete
         message("Subsetting complete. The results are saved as : ", file_name_full)
         
+        }, error = function(e) {
+          message(paste0(file_name," : ",e$message[1]))
+        })
+        
       } else {
-        # Download
+        
+        # Download full file
         tryCatch({
           curl::curl_download(url_final, destfile = file_name_full)
           message(paste0("File downloaded at: ",file_name_full))
