@@ -38,9 +38,9 @@ library(ggplot2)   # For visualization
 
 # NB: It is best practice to never write one's username/password in a script.
 # Rather one should save them in a file and load them into the environment.
-# Change the file pathway according to how you've saved your credentials:
-aviso_plus_cred <- read.csv("~/pCloudDrive/Documents/info/aviso_plus_pswd.csv")
-
+# Uncomment the following line and change the file pathway according to how you've saved your credentials
+  # Or rather load this into whatever environment you may be working from and are sourcing this script
+# aviso_plus_cred <- read.csv("~/pCloudDrive/Documents/info/aviso_plus_pswd.csv")
 
 # The download function ---------------------------------------------------
 

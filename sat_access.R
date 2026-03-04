@@ -2,16 +2,19 @@
 
 # Title: Satellite Data Access and Visualization Script
 # Author: Robert Schlegel
-# Date: January 2026
-# Description: This script downloads SPM or chlorophyll-a NetCDF files from a specified URL
-#              for given date ranges and plots the data.
+# Date: March 2026
+# Description: This script contains functions that can be used to
+#              download SPM or chlorophyll-a NetCDF files from a specified URL
+#              for given date ranges and plot the data.
+#              The products available via this script are SEXTANT and all files
+#              available on the Acri-ST ftp server for ODATIS products.
 
 
 # Libraries ---------------------------------------------------------------
 
 # Check for missing libraries and install them if necessary
-if (!all(c("argparse", "ncdf4", "curl", "reshape2", "ggplot2") %in% installed.packages())) {
-  install.packages(c("argparse", "ncdf4", "curl", "reshape2", "ggplot2"), repos = "https://cloud.r-project.org/")
+if (!all(c("argparse", "ncdf4", "curl", "lubridate", "reshape2", "maps", "ggplot2") %in% installed.packages())) {
+  install.packages(c("argparse", "ncdf4", "curl", "lubridate", "reshape2", "maps", "ggplot2"), repos = "https://cloud.r-project.org/")
 }
 
 # Uncomment this line if R cannot find python on Windows:
@@ -21,6 +24,7 @@ if (!all(c("argparse", "ncdf4", "curl", "reshape2", "ggplot2") %in% installed.pa
 library(argparse) # For parsing arguments from the command line
 library(ncdf4)    # For reading NetCDF files
 suppressPackageStartupMessages(library(curl)) # For FTP download
+library(lubridate) # For working with dates
 library(reshape2) # For data reshaping
 library(ggplot2)  # For visualization
 
@@ -30,20 +34,24 @@ library(ggplot2)  # For visualization
 # NB: If you have opened this script in R/RStudio and intend to run it manually, this section can be ignored.
 
 # Create the parser
-parser <- ArgumentParser(description = "Download a NetCDF file from FTP and plot a variable as a map.")
+parser <- ArgumentParser(description = "Download a NetCDF file and plot a variable as a map.")
 
 # Add arguments
-parser$add_argument("-v", "--variable", type = "character", required = TRUE, help = "Surface variable to fetch and plot")
+parser$add_argument("-v", "--variable", type = "character", required = TRUE, help = "Surface variable to fetch and plot.")
 parser$add_argument("-d", "--daterange", type = "character", nargs = '+', required = TRUE, 
                     help = "Date range of the desired variable in YYYY-MM-DD. Provide only one or two values. 
                     Note that if two dates are provided, only the first will be used for plotting.")
-parser$add_argument("-od", "--outputdir", type = "character", required = TRUE, help = "Location to save the NetCDF file and output image")
-parser$add_argument("-ov", "--overwrite", type = "logical", default = FALSE, 
-                    help = "Whether to overwrite an existing file or not. Default = FALSE")
+parser$add_argument("-p", "--product", type = "character", required = TRUE, help = "The data product to download. SEXTANT or ODATIS-MR.")
+parser$add_argument("-s", "--sensor", type = "character", required = TRUE, 
+                    help = "The chosen sensor for the corresponding product. SEXTANT is a blend, so no sensor is needed.
+                    For ODATIS-MR the choices are : MODIS, MERIS, OLCI-A, OLCI-B.")
 parser$add_argument("-p", "--plot", type = "logical", default = FALSE, 
-                    help = "Whether or not to plot the downloaded data. Default = False")
+                    help = "Whether or not to plot the downloaded data. Default = FALSE.")
 parser$add_argument("-bbox", "--boundingbox", nargs = 4, type = "double", required = FALSE,
-                    help = "The bounding box for plotting. Must be given as: lonmin, lonmax, latmin, latmax")
+                    help = "The bounding box for downloading and/or plotting. Must be given as: lonmin, lonmax, latmin, latmax")
+parser$add_argument("-od", "--outputdir", type = "character", required = TRUE, help = "Location to save the NetCDF file and/or output image.")
+parser$add_argument("-ov", "--overwrite", type = "logical", default = FALSE, 
+                    help = "Whether to overwrite an existing file or not. Default = FALSE.")
 
 # Create the function
 args <- parser$parse_args()
