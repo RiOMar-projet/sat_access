@@ -261,7 +261,7 @@ download_nc <- function(dl_var,
     url_year_doy <- paste0(substr(dl_date, start = 1, stop = 4),"/",strftime(as.Date(dl_date), format = "%j"))
     
     # Get URL specifics for SEXTANT
-    if(toupper(dl_product) == "SEXTANT"){
+    if(dl_product == "SEXTANT"){
       
       # Base URL
       # TODO: See if the data are stored anywhere with OpeNDAP access

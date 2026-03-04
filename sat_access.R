@@ -9,6 +9,11 @@
 #              The products available via this script are SEXTANT and all files
 #              available on the Acri-ST ftp server for ODATIS products.
 
+# NB: For a more interactive version of this script,
+# which also provides full access to the ODATIS-MR suite of products,
+# please rather use the script located here:
+# https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script.R
+
 
 # Libraries ---------------------------------------------------------------
 
@@ -37,19 +42,18 @@ library(ggplot2)  # For visualization
 parser <- ArgumentParser(description = "Download a NetCDF file and plot a variable as a map.")
 
 # Add arguments
-parser$add_argument("-v", "--variable", type = "character", required = TRUE, help = "Surface variable to fetch and plot.")
+parser$add_argument("-v", "--variable", type = "character", required = TRUE, 
+                    help = "Surface variable to fetch and plot.")
 parser$add_argument("-d", "--daterange", type = "character", nargs = '+', required = TRUE, 
                     help = "Date range of the desired variable in YYYY-MM-DD. Provide only one or two values. 
                     Note that if two dates are provided, only the first will be used for plotting.")
-parser$add_argument("-p", "--product", type = "character", required = TRUE, help = "The data product to download. SEXTANT or ODATIS-MR.")
-parser$add_argument("-s", "--sensor", type = "character", required = TRUE, 
-                    help = "The chosen sensor for the corresponding product. SEXTANT is a blend, so no sensor is needed.
-                    For ODATIS-MR the choices are : MODIS, MERIS, OLCI-A, OLCI-B.")
 parser$add_argument("-p", "--plot", type = "logical", default = FALSE, 
                     help = "Whether or not to plot the downloaded data. Default = FALSE.")
 parser$add_argument("-bbox", "--boundingbox", nargs = 4, type = "double", required = FALSE,
-                    help = "The bounding box for downloading and/or plotting. Must be given as: lonmin, lonmax, latmin, latmax")
-parser$add_argument("-od", "--outputdir", type = "character", required = TRUE, help = "Location to save the NetCDF file and/or output image.")
+                    help = "The bounding box for plotting. Note required if plot = FALSE.
+                    Must be given as: lonmin, lonmax, latmin, latmax")
+parser$add_argument("-od", "--outputdir", type = "character", required = TRUE, 
+                    help = "Location to save the NetCDF file and/or output image.")
 parser$add_argument("-ov", "--overwrite", type = "logical", default = FALSE, 
                     help = "Whether to overwrite an existing file or not. Default = FALSE.")
 
@@ -60,7 +64,12 @@ args <- parser$parse_args()
 # The function to call ----------------------------------------------------
 
 # Main function to download and plot
-download_and_plot <- function(dl_var, dl_dates, output_dir, overwrite, plot_var, bbox) {
+download_and_plot <- function(dl_var, 
+                              dl_dates,
+                              plot_var,
+                              bbox,
+                              output_dir, 
+                              overwrite) {
   
   ## Download code -----------------------------------------------------------
 
