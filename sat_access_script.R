@@ -18,6 +18,7 @@
 # Note that it is now necessary to access the ODATIS MR data with an AVISO+ account:
 # https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html
 
+
 # Libraries ---------------------------------------------------------------
 
 # Check for missing libraries and install them if necessary
@@ -48,6 +49,7 @@ library(ggplot2) # For visualization
 # Uncomment the following line and change the file pathway according to how you've saved your credentials
 # Or rather load this into whatever environment you may be working from and are sourcing this script
 # aviso_plus_cred <- read.csv("~/pCloudDrive/Documents/info/aviso_plus_pswd.csv")
+
 
 # The download function ---------------------------------------------------
 
@@ -189,14 +191,9 @@ download_nc <- function(
     } else {
       message(paste(
         "Bounding box provided, data will be downloaded from longitude ",
-        dl_bbox[1],
-        " to ",
-        dl_bbox[2],
-        " and latitude ",
-        dl_bbox[3],
-        " to ",
-        dl_bbox[4],
-        ".",
+        dl_bbox[1], " to ", dl_bbox[2],
+        " and latitude ", 
+        dl_bbox[3], " to ", dl_bbox[4], ".",
         sep = ""
       ))
     }
@@ -252,21 +249,7 @@ download_nc <- function(
     }
   } else if (dl_product == "ODATIS-MR") {
     if (dl_sensor == "MODIS") {
-      if (
-        !toupper(dl_var) %in%
-          c(
-            "CDOM",
-            "CHL",
-            "CHLA",
-            "RRS",
-            "NRRS",
-            "SPM",
-            "SPIM",
-            "SST",
-            "T",
-            "TUR"
-          )
-      ) {
+      if (!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "T", "TUR")) {
         stop(
           "ODATIS-MR MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
         )
@@ -327,16 +310,8 @@ download_nc <- function(
   if (start_date < floor_date_sensor | end_date > ceiling_date_sensor) {
     stop(paste0(
       "The chosen date range is outside of the available data range for : ",
-      dl_product,
-      " - ",
-      dl_sensor,
-      " - ",
-      dl_correction,
-      ". \n",
-      "Available data range is from ",
-      floor_date_sensor,
-      " to ",
-      ceiling_date_sensor,
+      dl_product, " - ", dl_sensor, " - ", dl_correction, ". \n",
+      "Available data range is from ", floor_date_sensor, " to ", ceiling_date_sensor,
       ". Please adjust your date range accordingly."
     ))
   }
@@ -726,23 +701,8 @@ download_nc <- function(
             nc_close(output_nc_data)
 
             # Remove data lists from memmory and clean
-            rm(
-              lon,
-              lat,
-              lon_indices,
-              lat_indices,
-              lon_subset,
-              lat_subset,
-              lonlat_start,
-              lonlat_count,
-              lon_dim,
-              lat_dim,
-              global_attrs,
-              var_data_list,
-              var_def_list,
-              var_info_i,
-              output_nc_data
-            )
+            rm(lon, lat, lon_indices, lat_indices, lon_subset, lat_subset, lonlat_start, lonlat_count,
+              lon_dim, lat_dim, global_attrs, var_data_list, var_def_list, var_info_i, output_nc_data)
             gc()
 
             # Print a message indicating the process is complete
