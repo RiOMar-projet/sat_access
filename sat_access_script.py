@@ -4,7 +4,6 @@ import re
 import shutil
 import urllib.request
 import warnings
-import pandas as pd
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import List, Optional, Tuple

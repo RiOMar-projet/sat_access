@@ -73,9 +73,17 @@ download_nc <- function(
   # Prep base ODATIS info
   ODATIS_MR_BBOX <- c(-7.8, 10.3, 41.2, 51.5)
   ODATIS_MR_TDS_BASE <- "https://tds-odatis.aviso.altimetry.fr/thredds"
-  # Assumed FTP root for the expert product. Adjust here if the final server path differs.
-  # ODATIS_MR_EXPERT_FTP_BASE <- "ftp://ftp.acrist-services.com/dataset-l3-ocean-color-odatis-mr-v_1_0/FRANCE"
   ODATIS_MR_EXPERT_FTP_BASE <- "ftp://ftp.acrist-services.com"
+  EXPERT_MODIS_vars <- c("CHL", "CHLA", "CHL1", "CDOM", "DOC", "SPM", "SPIM", "T", "TUR", "SST", "SST-NIGHT",
+                        "NRRS412", "NRRS443", "NRRS469", "NRRS490", "NRRS531", "NRRS547", 
+                        "NRRS555", "NRRS645", "NRRS670", "NRRS678", "NRRS748", "NRRS859", "NRRS869")
+  EXPERT_MERIS_vars <- c("CHL", "CHLA", "CHL1", "CDOM", "DOC", "POC", "SPM", "SPIM", "T", "TUR",
+                        "NRRS412", "NRRS443", "NRRS490", "NRRS510", "NRRS560", "NRRS620", "NRRS670", 
+                        "NRRS681", "NRRS709", "RRS754", "RRS779", "RRS865", "RRS885")
+  EXPERT_OLCI_vars <- c("BBP", "CHL", "CHLA", "CHL1", "CDOM", "DOC", "POC", "SPM", "SPIM", "T", "TUR",
+                        "NRRS400", "NRRS412", "NRRS443", "NRRS490", "NRRS510", "NRRS560", 
+                        "NRRS620", "NRRS670", "NRRS674", "NRRS681", "NRRS709",
+                        "RRS754", "RRS779", "RRS865", "RRS885", "RRS1020")
   
   # Check date range
   if (length(dl_dates) > 2) {
@@ -155,23 +163,39 @@ download_nc <- function(
     stop("Please ensure that 'dl_dates' are provided in 'YYYY-MM-DD' format.")
   }
 
+  # Set varable choice to upper case for easier handling in logic gates below
+  dl_var <- toupper(dl_var)
   # Check chosen variable against chosen data product
   if (is.null(dl_product)) {
-    if (toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")) {
+    if (dl_var %in% c("SPM", "SPIM", "CHL", "CHLA")) {
       message(
         "No data product chosen, defaulting to 'SEXTANT' for SPM and Chl a data."
       )
       dl_product <- "SEXTANT"
     } else if (
-      toupper(dl_var) %in% c("CDOM", "RRS", "NRRS", "T", "TUR", "SST", "SST-NIGHT")
+      dl_var %in% c("CDOM", "RRS", "NRRS", "T", "TUR", "SST", "SST-NIGHT")
     ) {
       message("No data product chosen, defaulting 'ODATIS-MR'.")
       dl_product <- "ODATIS-MR"
+    } else if (dl_var %in% c(EXPERT_MODIS_vars, EXPERT_MERIS_vars, EXPERT_OLCI_vars)) {
+      message(
+        paste0(
+        "No data product chosen, defaulting to 'ODATIS-MR EXPERT' because,",
+        dl_var, " is not available in the SEXTANT or ODATIS-MR products. 
+        Note that ODATIS-MR EXPERT access is currently not publicly available, 
+        so this will only work if you have an account with the necessary permissions."
+        )
+      )
     } else {
       stop("Variable not available, please check the value given for 'dl_var'")
     }
   }
   dl_product <- toupper(dl_product)
+  if(!dl_product %in% c("SEXTANT", "ODATIS-MR", "ODATIS-MR EXPERT")) {
+    stop(
+      "Data product not recognised, please set 'dl_product' to either 'SEXTANT', 'ODATIS-MR', or 'ODATIS-MR EXPERT'."
+    )
+  }
 
   # Get sensors, corrections, and processing for ODATIS-MR data products
   if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
@@ -181,7 +205,7 @@ download_nc <- function(
         " data products require an account.\n",
         "Please provide your username and password via the 'username' and 'password' arguments.\n",
         "For ODATIS-MR access, one may register for a free AVISO+ account here:\n",
-        "https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html",
+        "https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html\n",
         "ODATIS-MR EXPERT access is currently not publicly available."
       )
       return()
@@ -219,7 +243,7 @@ download_nc <- function(
 
     # Check chosen sensor against variable
     if (is.null(dl_sensor)) {
-      if (toupper(dl_var) %in% c("SST", "SST-NIGHT")) {
+      if (dl_var %in% c("SST", "SST-NIGHT")) {
         message(
           "No sensor chosen, defaulting to 'MODIS' for 'SST' or 'SST-NIGHT' data."
         )
@@ -257,25 +281,25 @@ download_nc <- function(
 
     if (dl_product == "ODATIS-MR EXPERT") {
       if (is.null(dl_processing)) {
-        if (toupper(dl_var) %in% c("CHL", "CHLA")) {
+        if (dl_var %in% c("CHL", "CHLA")) {
           message(
             "No processing chosen, defaulting to 'OC5' for chlorophyll data."
           )
           dl_processing <- "OC5"
         }
-        if (toupper(dl_var) %in% c("SPM", "SPIM")) {
+        if (dl_var %in% c("SPM", "SPIM")) {
           message(
             "No processing chosen, defaulting to 'G' for SPM data."
           )
           dl_processing <- "G"
         }
-      } else if (dl_sensor == "MODIS" & toupper(dl_var) %in% c("CHL", "CHLA") & dl_processing != "OC5") {
+      } else if (dl_sensor == "MODIS" & dl_var %in% c("CHL", "CHLA") & dl_processing != "OC5") {
         message(
             "Only 'OC5' processing available for MODIS chlorophyll data. 'dl_processing' adjusted accordingly."
           )
           dl_processing <- "OC5"
-      } else if (!toupper(dl_processing) %in% c("OC5", "GONS") & toupper(dl_var) %in% c("CHL", "CHLA") | 
-                 !toupper(dl_processing) %in% c("G", "R") & toupper(dl_var) %in% c("SPM", "SPIM")) {
+      } else if (!toupper(dl_processing) %in% c("OC5", "GONS") & dl_var %in% c("CHL", "CHLA") | 
+                 !toupper(dl_processing) %in% c("G", "R") & dl_var %in% c("SPM", "SPIM")) {
         stop("Please set 'dl_processing' to either 'OC5' or 'GONS' for CHL data or 'G' or 'R' for SPM data.")
       } else {
         dl_processing <- toupper(dl_processing)
@@ -295,22 +319,30 @@ download_nc <- function(
         "A bounding box was provided, but SEXTANT products cannot be subset at the source. Downloading the full file."
       )
     }
-    if (!toupper(dl_var) %in% c("SPM", "SPIM", "CHL", "CHLA")) {
+    if (!dl_var %in% c("SPM", "SPIM", "CHL", "CHLA")) {
       stop(
         "SEXTANT data product only contains SPM and Chl a data. Please adjust `dl_var` accordingly."
       )
     }
   } else if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
     if (dl_sensor == "MODIS") {
-      if (!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "SST-NIGHT", "T", "TUR")) {
+      if (dl_product == "ODATIS-MR" & 
+        !dl_var %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "SST-NIGHT", "T", "TUR")) {
         stop(
           paste0(
             dl_product,
-            " MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
+            " : MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
           )
         )
-      }
-      if(dl_product == "ODATIS-MR EXPERT"){
+      } else if (dl_product == "ODATIS-MR EXPERT" & 
+        !dl_var %in% c(EXPERT_MODIS_vars)) {
+        stop(
+          paste0(
+            dl_product,
+            " : MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
+          )
+        )
+      } else if(dl_product == "ODATIS-MR EXPERT"){
         if (dl_var == "SST-NIGHT" & dl_correction == "polymer") {
           message(
             "For ODATIS-MR EXPERT : MODIS : polymer data, SST-NIGHT are not available. 'dl_var' adjusted to 'SST' accordingly."
@@ -324,10 +356,17 @@ download_nc <- function(
         dl_var <- "SST-NIGHT"
       }
     } else if (dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B")) {
-      if (
-        !toupper(dl_var) %in%
-          c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "T", "TUR")
+      if (dl_product == "ODATIS-MR" &
+        !dl_var %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "T", "TUR")
       ) {
+        stop(paste0(
+          dl_product,
+          " : ",
+          dl_sensor,
+          " data product does not contain the requested variable. Please adjust your variable choice accordingly."
+        ))
+      } else if (dl_product == "ODATIS-MR EXPERT" & dl_sensor == "MERIS" & !dl_var %in% c(EXPERT_MERIS_vars) | 
+                 dl_product == "ODATIS-MR EXPERT" & dl_sensor %in% c("OLCI-A", "OLCI-B") & !dl_var %in% c(EXPERT_OLCI_vars)) {
         stop(paste0(
           dl_product,
           " : ",
@@ -418,11 +457,6 @@ download_nc <- function(
     dl_time_step <- "day"
   }
 
-  # TODO:
-  # Create a more intelligent logic gate that chooses the best product, sensor, and correction based on the variable and download dates chosen
-  # It must create messages for the user letting them know what has been chosen and why
-  # This would address the TODO item of choosing the 'best' chl-a etc. data given the bbox etc.
-
   # Iterate over each date in the range
   current_date <- start_date
   while (current_date <= end_date) {
@@ -442,13 +476,12 @@ download_nc <- function(
     # Get URL specifics for SEXTANT
     if (dl_product == "SEXTANT") {
       # Base URL
-      # TODO: See if the data are stored anywhere with OpeNDAP access
       url_base <- "ftp://ftp.ifremer.fr/ifremer/cersat/products/gridded/ocean-color/atlantic"
 
       # Prep file stub string
-      if (toupper(dl_var) %in% c("SPM", "SPIM")) {
+      if (dl_var %in% c("SPM", "SPIM")) {
         url_product_stub <- "EUR-L4-SPIM-ATL-v01"
-      } else if (toupper(dl_var) %in% c("CHL", "CHLA")) {
+      } else if (dl_var %in% c("CHL", "CHLA")) {
         url_product_stub <- "EUR-L4-CHL-ATL-v01"
       } else {
         stop("Variable not available")
@@ -505,15 +538,12 @@ download_nc <- function(
       }
 
       # Prep the variable string
-      if (dl_var %in% c("CDOM")) {
-        dl_var_chunk <- dl_var
-      } else if (dl_var %in% c("CHL", "CHLA")) {
+      if (dl_var %in% c("CHL", "CHLA")) {
         if (dl_product == "ODATIS-MR EXPERT") {
           dl_var_chunk <- paste0("CHL-", dl_processing)
         } else {
           dl_var_chunk <- "CHL-OC5"
         }
-        # TODO: Add all of the possible wavebands as variables here for the expert product, and adjust the logic gate accordingly
       } else if (dl_var %in% c("RRS", "NRRS")) {
         if (dl_sensor == "MODIS") {
           dl_var_chunk <- "NRRS555"
@@ -528,10 +558,8 @@ download_nc <- function(
         }
       } else if (dl_var %in% c("T", "TUR")) {
         dl_var_chunk <- "T-FNU"
-      } else if (dl_var %in% c("SST", "SST-NIGHT")) {
-        dl_var_chunk <- dl_var
       } else {
-        stop("Please check the value given for 'dl_sensor'")
+        dl_var_chunk <- dl_var
       }
 
       # Prep correction strings
@@ -551,12 +579,6 @@ download_nc <- function(
         dl_time_step_chunk <- "DAY"
       } else if (dl_time_step == "8-day") {
         dl_time_step_chunk <- "8D"
-
-        # if (dl_product == "ODATIS-MR EXPERT") {
-        #   stop(
-        #     "ODATIS-MR expert 8-day downloads are not yet supported because the FTP date catalogue lookup has not been defined."
-        #   )
-        # }
 
         # Get directory content
         # NB: The ACRI-ST FTP server appears to block R's attempts to list the directory content, 
