@@ -5,7 +5,8 @@
 # Date: February 2026
 # Description: This script contains functions that can be used to download and plot
 #              ocean colour NetCDF files for given date ranges and bounding boxes.
-#              The products available via this script are SEXTANT and ODATIS MR.
+#              The products available via this script are SEXTANT, ODATIS MR,
+#              and ODATIS MR expert.
 
 ## Useful documentation:
 
@@ -48,7 +49,8 @@ library(ggplot2) # For visualization
 # Rather one should save them in a file and load them into the environment.
 # Uncomment the following line and change the file pathway according to how you've saved your credentials
 # Or rather load this into whatever environment you may be working from and are sourcing this script
-# aviso_plus_cred <- read.csv("~/pCloudDrive/Documents/info/aviso_plus_pswd.csv")
+# aviso_plus_cred <- read.csv("aviso_plus_pswd.csv")
+# odatis_mr_expert_cred <- read.csv("odatis_mr_expert_pswrd.csv")
 
 
 # The download function ---------------------------------------------------
@@ -57,8 +59,9 @@ download_nc <- function(
   dl_var,
   dl_dates,
   dl_product = NULL,
-  dl_correction = NULL,
   dl_sensor = NULL,
+  dl_correction = NULL,
+  dl_processing = NULL,
   dl_time_step = NULL,
   dl_bbox = NULL,
   username = NULL,
@@ -66,6 +69,14 @@ download_nc <- function(
   output_dir,
   overwrite = FALSE
 ) {
+
+  # Prep base ODATIS info
+  ODATIS_MR_BBOX <- c(-7.8, 10.3, 41.2, 51.5)
+  ODATIS_MR_TDS_BASE <- "https://tds-odatis.aviso.altimetry.fr/thredds"
+  # Assumed FTP root for the expert product. Adjust here if the final server path differs.
+  # ODATIS_MR_EXPERT_FTP_BASE <- "ftp://ftp.acrist-services.com/dataset-l3-ocean-color-odatis-mr-v_1_0/FRANCE"
+  ODATIS_MR_EXPERT_FTP_BASE <- "ftp://ftp.acrist-services.com"
+  
   # Check date range
   if (length(dl_dates) > 2) {
     stop("Please provide only one or two dates for the date range.")
@@ -152,7 +163,7 @@ download_nc <- function(
       )
       dl_product <- "SEXTANT"
     } else if (
-      toupper(dl_var) %in% c("CDOM", "RRS", "NRRS", "T", "TUR", "SST")
+      toupper(dl_var) %in% c("CDOM", "RRS", "NRRS", "T", "TUR", "SST", "SST-NIGHT")
     ) {
       message("No data product chosen, defaulting 'ODATIS-MR'.")
       dl_product <- "ODATIS-MR"
@@ -160,28 +171,36 @@ download_nc <- function(
       stop("Variable not available, please check the value given for 'dl_var'")
     }
   }
+  dl_product <- toupper(dl_product)
 
-  # Get sensors and corrections for ODATIS-MR data products
-  if (dl_product == "ODATIS-MR") {
+  # Get sensors, corrections, and processing for ODATIS-MR data products
+  if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
     if (is.null(username) | is.null(password)) {
       message(
-        "ODATIS-MR data products require an AVISO+ account.\n",
+        dl_product,
+        " data products require an account.\n",
         "Please provide your username and password via the 'username' and 'password' arguments.\n",
-        "One may register for a free account here:\n",
-        "https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html"
+        "For ODATIS-MR access, one may register for a free AVISO+ account here:\n",
+        "https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html",
+        "ODATIS-MR EXPERT access is currently not publicly available."
       )
       return()
     }
 
-    if (is.null(dl_bbox)) {
+    if (dl_product == "ODATIS-MR EXPERT" & !is.null(dl_bbox)) {
+      message(
+        "A bounding box was provided, but ODATIS-MR expert FTP access does not support source subsetting. Downloading the full file."
+      )
+      dl_bbox <- NULL
+    } else if (is.null(dl_bbox)) {
       message(
         "No bounding box provided, data will be downloaded for the full extent of the product."
       )
     } else if (
-      dl_bbox[1] < -7.8 |
-        dl_bbox[2] > 10.3 |
-        dl_bbox[3] < 41.2 |
-        dl_bbox[4] > 51.5
+      dl_bbox[1] < ODATIS_MR_BBOX[1] |
+        dl_bbox[2] > ODATIS_MR_BBOX[2] |
+        dl_bbox[3] < ODATIS_MR_BBOX[3] |
+        dl_bbox[4] > ODATIS_MR_BBOX[4]
     ) {
       message(
         "The bounding box provided exceeds the extent of the ODATIS-MR data product :/n",
@@ -198,16 +217,16 @@ download_nc <- function(
       ))
     }
 
-    # Check chosen sensor against data product
+    # Check chosen sensor against variable
     if (is.null(dl_sensor)) {
-      if (dl_var == "SST") {
+      if (toupper(dl_var) %in% c("SST", "SST-NIGHT")) {
         message(
-          "No sensor chosen, defaulting to 'MODIS' because 'dl_var = SST'."
+          "No sensor chosen, defaulting to 'MODIS' for 'SST' or 'SST-NIGHT' data."
         )
         dl_sensor <- "MODIS"
       } else {
-        message("No sensor chosen, defaulting to 'OLCI-A'.")
-        dl_sensor <- "OLCI-A"
+        message("No sensor chosen, defaulting to 'MODIS'.")
+        dl_sensor <- "MODIS"
       }
     } else if (!dl_sensor %in% c("MODIS", "MERIS", "OLCI-A", "OLCI-B")) {
       stop(
@@ -230,12 +249,46 @@ download_nc <- function(
         ))
         dl_correction <- "polymer"
       }
-    } else if (!dl_correction %in% c("polymer", "nirswir")) {
-      stop("Please set 'dl_correction' to either 'polymer' or 'nirswir'")
+    } else if (!dl_correction %in% c("acolite", "polymer", "nirswir")) {
+      stop(
+        "Please set 'dl_correction' to one of: 'polymer', 'nirswir', or 'acolite' for ODATIS-MR EXPERT only"
+      )
+    }
+
+    if (dl_product == "ODATIS-MR EXPERT") {
+      if (is.null(dl_processing)) {
+        if (toupper(dl_var) %in% c("CHL", "CHLA")) {
+          message(
+            "No processing chosen, defaulting to 'OC5' for chlorophyll data."
+          )
+          dl_processing <- "OC5"
+        }
+        if (toupper(dl_var) %in% c("SPM", "SPIM")) {
+          message(
+            "No processing chosen, defaulting to 'G' for SPM data."
+          )
+          dl_processing <- "G"
+        }
+      } else if (dl_sensor == "MODIS" & toupper(dl_var) %in% c("CHL", "CHLA") & dl_processing != "OC5") {
+        message(
+            "Only 'OC5' processing available for MODIS chlorophyll data. 'dl_processing' adjusted accordingly."
+          )
+          dl_processing <- "OC5"
+      } else if (!toupper(dl_processing) %in% c("OC5", "GONS") & toupper(dl_var) %in% c("CHL", "CHLA") | 
+                 !toupper(dl_processing) %in% c("G", "R") & toupper(dl_var) %in% c("SPM", "SPIM")) {
+        stop("Please set 'dl_processing' to either 'OC5' or 'GONS' for CHL data or 'G' or 'R' for SPM data.")
+      } else {
+        dl_processing <- toupper(dl_processing)
+      }
+    } else if (!is.null(dl_processing)) {
+      message(
+        "'dl_processing' is only used for 'ODATIS-MR EXPERT' and will be ignored."
+      )
+      dl_processing <- NULL
     }
   }
 
-  # Check that the chosen product, sensor, correction combos are possible
+  # Check that the chosen product, sensor, variable combos are possible
   if (dl_product == "SEXTANT") {
     if (!is.null(dl_bbox)) {
       message(
@@ -247,12 +300,28 @@ download_nc <- function(
         "SEXTANT data product only contains SPM and Chl a data. Please adjust `dl_var` accordingly."
       )
     }
-  } else if (dl_product == "ODATIS-MR") {
+  } else if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
     if (dl_sensor == "MODIS") {
-      if (!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "T", "TUR")) {
+      if (!toupper(dl_var) %in% c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "SST", "SST-NIGHT", "T", "TUR")) {
         stop(
-          "ODATIS-MR MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
+          paste0(
+            dl_product,
+            " MODIS data product does not contain the requested variable. Please adjust your variable choice accordingly."
+          )
         )
+      }
+      if(dl_product == "ODATIS-MR EXPERT"){
+        if (dl_var == "SST-NIGHT" & dl_correction == "polymer") {
+          message(
+            "For ODATIS-MR EXPERT : MODIS : polymer data, SST-NIGHT are not available. 'dl_var' adjusted to 'SST' accordingly."
+          )
+          dl_var <- "SST"
+        }
+      } else if (dl_var == "SST"){
+        message(
+          "For ODATIS-MR : MODIS, only night-time SST data are available. 'dl_var' adjusted to 'SST-NIGHT' accordingly."
+        )
+        dl_var <- "SST-NIGHT"
       }
     } else if (dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B")) {
       if (
@@ -260,7 +329,8 @@ download_nc <- function(
           c("CDOM", "CHL", "CHLA", "RRS", "NRRS", "SPM", "SPIM", "T", "TUR")
       ) {
         stop(paste0(
-          "ODATIS-MR : ",
+          dl_product,
+          " : ",
           dl_sensor,
           " data product does not contain the requested variable. Please adjust your variable choice accordingly."
         ))
@@ -269,21 +339,45 @@ download_nc <- function(
   }
 
   # Check that the chosen correction against chosen data product and sensor and correct if necessary
-  if (dl_product == "ODATIS-MR") {
-    if (dl_sensor == "MODIS" & dl_correction != "nirswir") {
-      message(
-        "ODATIS-MR : MODIS data product only uses the 'nirswir' atmospheric correction. 'dl_correction' adjusted accordingly."
-      )
+  if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
+    if (dl_product == "ODATIS-MR" & 
+        dl_sensor == "MODIS" & 
+        dl_correction != "nirswir") {
+      message(paste0(
+        dl_product,
+        " : MODIS data product only uses the 'nirswir' atmospheric correction. 'dl_correction' adjusted accordingly."
+      ))
       dl_correction <- "nirswir"
     } else if (
-      dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B") & dl_correction != "polymer"
+      dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B") &
+        dl_product == "ODATIS-MR" &
+        dl_correction != "polymer"
     ) {
       message(paste0(
-        "ODATIS-MR : ",
-        dl_sensor,
+        "ODATIS-MR : ", dl_sensor,
         " data product only uses the 'polymer' atmospheric correction. 'dl_correction' adjusted accordingly."
       ))
       dl_correction <- "polymer"
+    } else if (
+      dl_sensor %in% c("MERIS", "OLCI-A", "OLCI-B") &
+        dl_product == "ODATIS-MR EXPERT" &
+        !dl_correction %in% c("acolite", "polymer")
+    ) {
+      message(paste0(
+        "ODATIS-MR expert : ", dl_sensor,
+        " data product only uses the 'polymer' or 'acolite' atmospheric corrections. 'dl_correction' adjusted to 'polymer'"
+      ))
+      dl_correction <- "polymer"
+    } else if (
+      dl_sensor %in% c("MODIS") &
+        dl_product == "ODATIS-MR EXPERT" &
+        !dl_correction %in% c("polymer", "nirswir")
+    ) {
+      message(paste0(
+        "ODATIS-MR expert : ", dl_sensor,
+        " data product only uses the 'nirswir' or 'polymer' atmospheric corrections. 'dl_correction' adjusted to 'nirswir'"
+      ))
+      dl_correction <- "nirswir"
     }
   }
 
@@ -362,38 +456,45 @@ download_nc <- function(
 
       # Variable specifics
       url_product <- paste0(url_product_stub, "/", url_year_doy)
-      file_name <- paste0(
-        dl_date_flat,
-        "-",
-        url_product_stub,
-        "-fv01-OI.nc.bz2"
-      )
-      nc_file <- file.path(
-        output_dir,
+      file_name <- paste0(dl_date_flat,"-",url_product_stub,"-fv01-OI.nc.bz2")
+      nc_file <- file.path(output_dir,
         paste0(dl_date_flat, "-", url_product_stub, "-fv01-OI.nc")
       )
 
       # Get URL specifics for ODATIS-MR
-    } else if (toupper(dl_product) == "ODATIS-MR") {
+    } else if (dl_product %in% c("ODATIS-MR", "ODATIS-MR EXPERT")) {
       # Correct @ in password
       username_fix <- gsub("@", "%40", username)
       password_fix <- gsub("@", "%40", password)
 
       # Base URL
-      if (is.null(dl_bbox)) {
-        access_type <- "fileServer"
+      if (dl_product == "ODATIS-MR") {
+        if (is.null(dl_bbox)) {
+          access_type <- "fileServer"
+        } else {
+          access_type <- "dodsC"
+        }
+        url_base <- paste0(
+          "https://",
+          username_fix,
+          ":",
+          password_fix,
+          "@",
+          sub("^https://", "", ODATIS_MR_TDS_BASE),
+          "/",
+          access_type,
+          "/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
+        )
       } else {
-        access_type <- "dodsC"
+        url_base <- paste0(
+          "ftp://",
+          username_fix,
+          ":",
+          password_fix,
+          "@",
+          sub("^ftp://", "", ODATIS_MR_EXPERT_FTP_BASE)
+        )
       }
-      url_base <- paste0(
-        "https://",
-        username_fix,
-        ":",
-        password_fix,
-        "@tds-odatis.aviso.altimetry.fr/thredds/",
-        access_type,
-        "/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"
-      )
 
       # Prep sensor strings
       dl_sensor_flat <- tolower(gsub("-", "", dl_sensor))
@@ -403,21 +504,16 @@ download_nc <- function(
         dl_sensor_chunk <- substr(dl_sensor, start = 1, stop = 3)
       }
 
-      # Prep correction strings
-      dl_correction_flat <- tolower(gsub("-", "", dl_correction))
-      if (dl_correction == "polymer") {
-        dl_correction_chunk <- "PO"
-      } else if (dl_correction == "nirswir") {
-        dl_correction_chunk <- "NS"
-      } else {
-        stop("Please check the value given for 'dl_correction'")
-      }
-
       # Prep the variable string
       if (dl_var %in% c("CDOM")) {
         dl_var_chunk <- dl_var
       } else if (dl_var %in% c("CHL", "CHLA")) {
-        dl_var_chunk <- "CHL-OC5"
+        if (dl_product == "ODATIS-MR EXPERT") {
+          dl_var_chunk <- paste0("CHL-", dl_processing)
+        } else {
+          dl_var_chunk <- "CHL-OC5"
+        }
+        # TODO: Add all of the possible wavebands as variables here for the expert product, and adjust the logic gate accordingly
       } else if (dl_var %in% c("RRS", "NRRS")) {
         if (dl_sensor == "MODIS") {
           dl_var_chunk <- "NRRS555"
@@ -425,13 +521,29 @@ download_nc <- function(
           dl_var_chunk <- "NRRS560"
         }
       } else if (dl_var %in% c("SPM", "SPIM")) {
-        dl_var_chunk <- "SPM-G"
+        if (dl_product == "ODATIS-MR EXPERT") {
+          dl_var_chunk <- paste0("SPM-", dl_processing)
+        } else {
+          dl_var_chunk <- "SPM-G"
+        }
       } else if (dl_var %in% c("T", "TUR")) {
         dl_var_chunk <- "T-FNU"
-      } else if (dl_var %in% c("SST")) {
-        dl_var_chunk <- "SST-NIGHT"
+      } else if (dl_var %in% c("SST", "SST-NIGHT")) {
+        dl_var_chunk <- dl_var
       } else {
         stop("Please check the value given for 'dl_sensor'")
+      }
+
+      # Prep correction strings
+      dl_correction_flat <- tolower(gsub("-", "", dl_correction))
+      if (dl_correction_flat == "polymer") {
+        dl_correction_chunk <- "PO"
+      } else if (dl_correction_flat == "nirswir") {
+        dl_correction_chunk <- "NS"
+      } else if (dl_correction_flat == "acolite") {
+        dl_correction_chunk <- "AC"
+      } else {
+        stop("Please check the value given for 'dl_correction', it should be one of 'polymer', 'nirswir', or 'acolite'")
       }
 
       # Prep time-step string
@@ -440,22 +552,48 @@ download_nc <- function(
       } else if (dl_time_step == "8-day") {
         dl_time_step_chunk <- "8D"
 
+        # if (dl_product == "ODATIS-MR EXPERT") {
+        #   stop(
+        #     "ODATIS-MR expert 8-day downloads are not yet supported because the FTP date catalogue lookup has not been defined."
+        #   )
+        # }
+
         # Get directory content
-        url_8day_dir <- paste(
-          "https://tds-odatis.aviso.altimetry.fr/thredds/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE",
-          dl_correction_flat,
-          dl_sensor_flat,
-          dl_time_step,
-          dl_year,
-          dl_month,
-          "catalog.html",
-          sep = "/"
-        )
-        url_8day_catalog <- grep(
-          "\\d{2}/catalog\\.html",
-          readLines(url_8day_dir),
-          value = TRUE
-        )
+        if(dl_product == "ODATIS-MR EXPERT"){
+          url_8day_dir <- paste(
+            url_base,
+            dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month,
+            sep = "/"
+          )
+          # List root directories
+          root_listing <- RCurl::getURL(
+            "ftp://ftp.acrist-services.com/",
+            userpwd = paste0(username_fix, ":", password_fix),
+            dirlistonly = TRUE,
+            ftp.use.epsv = FALSE
+          )
+
+          root_listing |>
+            strsplit("\n") |>
+            unlist()
+          ftp_listing <- curl_fetch_memory(url_8day_dir)
+          url_8day_catalog <- grep(
+            "\\d{2}/catalog\\.html",
+            strsplit(rawToChar(ftp_listing$content), "\n")[[1]],
+            value = TRUE
+          )
+        } else {
+          url_8day_dir <- paste(
+            paste0(ODATIS_MR_TDS_BASE, "/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"),
+            dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, "catalog.html",
+            sep = "/"
+          )
+          url_8day_catalog <- grep(
+            "\\d{2}/catalog\\.html",
+            readLines(url_8day_dir),
+            value = TRUE
+          )        
+        }
         url_8day_days <- unique(unlist(regmatches(
           url_8day_catalog,
           gregexpr("\\d+", url_8day_catalog)
@@ -500,7 +638,7 @@ download_nc <- function(
             format(ceiling_date_sensor, "%Y%m%d")
           )
         }
-      } else if (dl_time_step == "month") {
+        } else if (dl_time_step == "month") {
         dl_time_step_chunk <- "MO"
         dl_date_flat <- paste0(
           format(floor_date(ymd(dl_date), "month"), "%Y%m%d"),
@@ -513,13 +651,13 @@ download_nc <- function(
 
       # Product URL
       url_product <- paste(
-        dl_correction_flat,
-        dl_sensor_flat,
-        dl_time_step,
-        dl_year,
-        dl_month,
-        dl_day,
-        sep = "/"
+         dl_correction_flat,
+         dl_sensor_flat,
+         dl_time_step,
+         dl_year,
+         dl_month,
+         dl_day,
+         sep = "/"
       )
       file_name <- paste0(
         "L3m_",
@@ -702,7 +840,7 @@ download_nc <- function(
 
             # Remove data lists from memmory and clean
             rm(lon, lat, lon_indices, lat_indices, lon_subset, lat_subset, lonlat_start, lonlat_count,
-              lon_dim, lat_dim, global_attrs, var_data_list, var_def_list, var_info_i, output_nc_data)
+               lon_dim, lat_dim, global_attrs, var_data_list, var_def_list, output_nc_data)
             gc()
 
             # Print a message indicating the process is complete
@@ -808,7 +946,8 @@ plot_nc <- function(
       )
     }
 
-    # ODATIS-MR files
+  # ODATIS-MR files
+    # TODO: Add more of the possible variable name structures for the ODATIS-MR expert product when they are available and adjust the logic gate accordingly
   } else if (length(file_snippets) == 9) {
     nc_var_name <- paste0(file_snippets[7], "_mean")
   } else {
@@ -979,144 +1118,35 @@ plot_nc <- function(
 
 # Examples ----------------------------------------------------------------
 
-## Downloading ------------------------------------------------------------
-
-# download_nc() will attempt to pick the correct sensors etc based on the requested variable and dates
-
-# NB: It is only necessary to give the function a value for 'dl_var', it will figure out the rest
-# But if you want a specific product etc., these are the options
-## Possible values for 'dl_var' : "SPM", "CHL", "CDOM", "RRS", "T", "SST"
-## Possible values for 'dl_product' : "SEXTANT", "ODATIS-MR"
-## Possible values for 'dl_sensor' : "MODIS", "MERIS", "OLCI-A", "OLCI-B"
-## Possible values for 'dl_correction' : "polymer", "nirswir"
-## Possible values for 'dl_time_step' : "day", "8-day", "month"
-
-# Download a few days of SPM data
-# NB: If no product is chosen, CHL and SPM default to SEXTANT
-# download_nc(
-#   dl_var = "SPM",
-#   dl_dates = c("2025-09-01", "2025-09-05"),
-#   output_dir = "~/data/SEXTANT", # Change as desired
-#   overwrite = FALSE # Change to TRUE to force downloads
-# )
-
-# Download a few days of CHL data
-# NB: If no product is chosen, CHL and SPM default to SEXTANT
-# download_nc(
-#   dl_var = "CHL",
-#   dl_dates = c("2025-09-01", "2025-09-05"),
-#   output_dir = "~/data/SEXTANT",
-#   overwrite = FALSE
-# )
-
 # Download one day of SPM data from MODIS for a given bounding box
-# download_nc(
-#   dl_var = "SPM",
-#   dl_dates = c("2008-12-25"),
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "MODIS",
-#   dl_bbox = c(3, 4, 42.5, 44),
-#   username = aviso_plus_cred$usrname, # Change to match how you've loaded your username
-#   password = aviso_plus_cred$psswrd, # Change to match how you've loaded your password
-#   output_dir = "~/data/MODIS", # Change as desired/required
-#   overwrite = TRUE
-# )
+download_nc(
+  dl_var = "SST",
+  dl_dates = c("2012-12-25", "2013-01-07"),
+  dl_product = "ODATIS-MR",
+  dl_sensor = "MODIS",
+  dl_bbox = c(3, 4, 42.5, 44),
+  dl_time_step = "8-day",
+  username = aviso_plus_cred$usrname, # Change to match how you've loaded your username
+  password = aviso_plus_cred$psswrd, # Change to match how you've loaded your password
+  output_dir = "~/data/MODIS", # Change as desired/required
+  overwrite = TRUE
+)
 
-# Download one day of Chl a data from MERIS
-# download_nc(
-#   dl_var = "CHL",
-#   dl_dates = c("2008-12-25"),
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "MERIS",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/MERIS",
-#   overwrite = FALSE
-# )
+# Download one day of expert Chl a data from MERIS with acolite correction and OC5 processing
+download_nc(
+  dl_var = "SST-NIGHT",
+  dl_dates = c("2023-06-19"),
+  dl_product = "ODATIS-MR EXPERT",
+  dl_sensor = "MODIS",
+  dl_correction = "nirswir",
+  dl_time_step = "8-day",
+  # dl_processing = "R",
+  username = odatis_mr_expert_cred$usrname,
+  password = odatis_mr_expert_cred$psswrd,
+  output_dir = "~/data/OLCI-MODIS-expert",
+  overwrite = FALSE
+)
 
-# Download a few days of CDOM data
-# NB: If not specified, the default sensor for ODATIS MR is OLCI-A
-# download_nc(
-#   dl_var = "CDOM",
-#   dl_dates = c("2024-09-01", "2024-09-05"),
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/OLCI-A",
-#   overwrite = FALSE
-# )
-
-# Download one day of SST data
-# NB: The default sensor for SST is MODIS
-# download_nc(
-#   dl_var = "SST",
-#   dl_dates = "2014-01-01",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/MODIS",
-#   overwrite = FALSE
-# )
-
-# Download one day of turbidity data from OLCI-B
-# download_nc(
-#   dl_var = "T",
-#   dl_dates = "2019-01-01",
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "OLCI-B",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/OLCI-B",
-#   overwrite = FALSE
-# )
-
-# Download RRS data from MODIS (W_nm 555)
-# download_nc(
-#   dl_var = "RRS",
-#   dl_dates = "2019-01-01",
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "MODIS",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/MODIS",
-#   overwrite = FALSE
-# )
-
-# Download RRS data from OLCI-A (W_nm 560)
-# download_nc(
-#   dl_var = "RRS",
-#   dl_dates = "2019-01-01",
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "OLCI-A",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/OLCI-A",
-#   overwrite = FALSE
-# )
-
-# Download a few 8-day averages of Chl a data for the full extent of France
-# download_nc(
-#   dl_var = "CHL",
-#   dl_dates = c("2019-01-01", "2019-01-25"),
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "OLCI-A",
-#   dl_time_step = "8-day",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/OLCI-A",
-#   overwrite = FALSE
-# )
-
-# Download a three months of Turbidity data from OLCI-A
-# download_nc(
-#   dl_var = "T",
-#   dl_dates = c("2019-01-01", "2019-03-01"),
-#   dl_product = "ODATIS-MR",
-#   dl_sensor = "OLCI-A",
-#   dl_time_step = "month",
-#   username = aviso_plus_cred$usrname,
-#   password = aviso_plus_cred$psswrd,
-#   output_dir = "~/data/OLCI-A",
-#   overwrite = FALSE
-# )
 
 ## Plotting ---------------------------------------------------------------
 
