@@ -1,6 +1,6 @@
 # Overview
 
-This repository contains scripts designed to facilitate access to the **SEXTANT** and **ODATIS-MR** satellite products for members of the RiOMar project. 
+This repository contains scripts designed to facilitate access to the **SEXTANT** and **ODATIS-MR** satellite products for members of the RiOMar project. **NB**: Access to **ODATIS-MR** data requires an AVISO+ account. This can be created for free [here](https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html).
 
 The `sat_access_script.R` & `sat_access_script.py` scripts have been created so that they can be used to import the necessary acces/plotting functions into whatever standard workflow the user would be developing that would need access to satellite data. The scripts may simply be downloaded individually as the user needs and run on their local computer. They are designed to require little to no setup in order to download and visualise the data files. The Jupyter notebook giving examples for their usage may be found [here](https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script_examples.ipynb).
 
