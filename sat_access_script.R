@@ -559,41 +559,20 @@ download_nc <- function(
         # }
 
         # Get directory content
-        if(dl_product == "ODATIS-MR EXPERT"){
-          url_8day_dir <- paste(
-            url_base,
-            dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month,
-            sep = "/"
-          )
-          # List root directories
-          root_listing <- RCurl::getURL(
-            "ftp://ftp.acrist-services.com/",
-            userpwd = paste0(username_fix, ":", password_fix),
-            dirlistonly = TRUE,
-            ftp.use.epsv = FALSE
-          )
-
-          root_listing |>
-            strsplit("\n") |>
-            unlist()
-          ftp_listing <- curl_fetch_memory(url_8day_dir)
-          url_8day_catalog <- grep(
-            "\\d{2}/catalog\\.html",
-            strsplit(rawToChar(ftp_listing$content), "\n")[[1]],
-            value = TRUE
-          )
-        } else {
-          url_8day_dir <- paste(
-            paste0(ODATIS_MR_TDS_BASE, "/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"),
-            dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, "catalog.html",
-            sep = "/"
-          )
-          url_8day_catalog <- grep(
-            "\\d{2}/catalog\\.html",
-            readLines(url_8day_dir),
-            value = TRUE
-          )        
-        }
+        # NB: The ACRI-ST FTP server appears to block R's attempts to list the directory content, 
+        # so we have to scrape the HTML page instead to get the available dates for the 8-day files. 
+        # This is a bit hacky but it works for now. 
+        # If ACRI-ST opens up the FTP directory listing in the future, this will be added.
+        url_8day_dir <- paste(
+          paste0(ODATIS_MR_TDS_BASE, "/catalog/dataset-l3-ocean-color-odatis-mr-v_1_0.xml/FRANCE"),
+          dl_correction_flat, dl_sensor_flat, dl_time_step, dl_year, dl_month, "catalog.html",
+          sep = "/"
+        )
+        url_8day_catalog <- grep(
+          "\\d{2}/catalog\\.html",
+          readLines(url_8day_dir),
+          value = TRUE
+        )
         url_8day_days <- unique(unlist(regmatches(
           url_8day_catalog,
           gregexpr("\\d+", url_8day_catalog)
@@ -1116,120 +1095,3 @@ plot_nc <- function(
   message(paste0("Image saved at: ", plot_name))
 }
 
-# Examples ----------------------------------------------------------------
-
-# Download one day of SPM data from MODIS for a given bounding box
-download_nc(
-  dl_var = "SST",
-  dl_dates = c("2012-12-25", "2013-01-07"),
-  dl_product = "ODATIS-MR",
-  dl_sensor = "MODIS",
-  dl_bbox = c(3, 4, 42.5, 44),
-  dl_time_step = "8-day",
-  username = aviso_plus_cred$usrname, # Change to match how you've loaded your username
-  password = aviso_plus_cred$psswrd, # Change to match how you've loaded your password
-  output_dir = "~/data/MODIS", # Change as desired/required
-  overwrite = TRUE
-)
-
-# Download one day of expert Chl a data from MERIS with acolite correction and OC5 processing
-download_nc(
-  dl_var = "SST-NIGHT",
-  dl_dates = c("2023-06-19"),
-  dl_product = "ODATIS-MR EXPERT",
-  dl_sensor = "MODIS",
-  dl_correction = "nirswir",
-  dl_time_step = "8-day",
-  # dl_processing = "R",
-  username = odatis_mr_expert_cred$usrname,
-  password = odatis_mr_expert_cred$psswrd,
-  output_dir = "~/data/OLCI-MODIS-expert",
-  overwrite = FALSE
-)
-
-
-## Plotting ---------------------------------------------------------------
-
-# NB: plot_nc() will automagically detect the necessary .nc structure and variable from the file name
-# Note that it is only designed to work with files downloaded via download_nc()
-# This means it should work with the file structure for all SEXTANT and ODATIS MR products
-
-# Plot an SPM NetCDF file
-# plot_nc(
-#   nc_file = "~/data/MODIS/L3m_20081225__FRANCE_03_MOD_SPM-G-NS_DAY_00.nc",
-#   bbox = c(3, 4, 42.5, 44),
-#   plot_width = 5,
-#   plot_height = 10,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot a Chl a NetCDF file
-# plot_nc(
-#   nc_file = "~/data/SEXTANT/20251225-EUR-L4-CHL-ATL-v01-fv01-OI.nc",
-#   bbox = c(-3.5, -0.5, 44, 48),
-#   plot_width = 5,
-#   plot_height = 9,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot a CDOM NetCDF file
-# # NB: Providing no 'bbox' argument will plot the full extent of the data in the file
-# plot_nc(
-#   nc_file = "~/data/OLCI-A/L3m_20220901__FRANCE_03_OLA_CDOM-PO_DAY_00.nc",
-#   plot_width = 7,
-#   plot_height = 6,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot an SST NetCDF file
-# plot_nc(
-#   nc_file = "~/data/MODIS/L3m_20140101__FRANCE_03_MOD_SST-NIGHT-NS_DAY_00.nc",
-#   bbox = c(-5, 10, 40, 55),
-#   plot_width = 8,
-#   plot_height = 6,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot a turbidity NetCDF file
-# plot_nc(
-#   nc_file = "~/data/OLCI-B/L3m_20190101__FRANCE_03_OLB_T-FNU-PO_DAY_00.nc",
-#   bbox = c(2, 6, 41, 44),
-#   plot_width = 6,
-#   plot_height = 5,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot an RRS NetCDF file from MODIS
-# plot_nc(
-#   nc_file = "~/data/MODIS/L3m_20190101__FRANCE_03_MOD_NRRS555-NS_DAY_00.nc",
-#   bbox = c(2, 5, 41, 45),
-#   plot_width = 7,
-#   plot_height = 6,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot an RRS NetCDF file from OLCI-A
-# plot_nc(
-#   nc_file = "~/data/OLCI-A/L3m_20190101__FRANCE_03_OLA_NRRS560-PO_DAY_00.nc",
-#   plot_width = 7,
-#   plot_height = 6,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot an 8-day average of Chl a data
-# plot_nc(
-#   nc_file = "~/data/OLCI-A/L3m_20181219-20181226__FRANCE_03_OLA_CHL-OC5-PO_8D_00.nc",
-#   # bbox = c(2, 6, 41, 44),
-#   plot_width = 5,
-#   plot_height = 5,
-#   output_dir = "~/Downloads"
-# )
-
-# Plot one month of turbidity data
-# plot_nc(
-#   nc_file = "~/data/OLCI-A/L3m_20190201-20190228__FRANCE_03_OLA_T-FNU-PO_MO_00.nc",
-#   # bbox = c(2, 6, 41, 44),
-#   plot_width = 5,
-#   plot_height = 5,
-#   output_dir = "~/Downloads"
-# )
