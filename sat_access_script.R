@@ -67,7 +67,8 @@ download_nc <- function(
   username = NULL,
   password = NULL,
   output_dir,
-  overwrite = FALSE
+  overwrite = FALSE,
+  return_url = FALSE
 ) {
 
   # Prep base ODATIS info
@@ -680,6 +681,11 @@ download_nc <- function(
     # Assemble final URL
     url_final <- paste(url_base, url_product, file_name, sep = "/")
     file_name_full <- file.path(output_dir, file_name)
+
+    # Exit if only the URL has been requested
+    if(return_url){
+      return(url_final)
+    }
 
     # Fetch file
     if (file.exists(file_name_full) & !overwrite) {
