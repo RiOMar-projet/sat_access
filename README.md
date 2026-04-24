@@ -1,95 +1,156 @@
-# Overview
+# 🛰️ sat_access
 
-This repository contains scripts designed to facilitate access to the **SEXTANT** and **ODATIS-MR** satellite products for members of the RiOMar project. **NB**: Access to **ODATIS-MR** data requires an AVISO+ account. This can be created for free [here](https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html).
+> Simple `R` and `Python` tools for downloading and visualizing **SEXTANT** and **ODATIS-MR** satellite products for the RiOMar project.
 
-The `sat_access_script.R` & `sat_access_script.py` scripts have been created so that they can be used to import the necessary acces/plotting functions into whatever standard workflow the user would be developing that would need access to satellite data. The scripts may simply be downloaded individually as the user needs and run on their local computer. They are designed to require little to no setup in order to download and visualise the data files. The Jupyter notebook giving examples for their usage may be found [here](https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script_examples.ipynb).
+## ✨ Overview
 
-There are also the `sat_access.py` & `sat_access.R` scripts, which allow the user to download **SEXTANT** NetCDF files for Chl _a_ and/or SPM from an FTP server and visualize one day of data on a map directly via command line interface (CLI) calls. Note however that running command line requests for `R` can require a non-neglible amount of setup on one's local computer, so it is advised to use `sat_access_script.R`. The Jupyter notebook that explains how to use these two CLI focussed scripts may be found [here](https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_cli_usage.ipynb).
+This repository contains lightweight scripts designed to make satellite data access straightforward for RiOMar users.
 
-# Features
+It supports:
 
--   No installation required
--   Simply download a script and source it or call it from the command-line
--   Downloads a range of NetCDF files for **SEXTANT** and **ODATIS-MR**
--   Extracts and visualizes specified dates, bounding boxes, and variables as a map
--   Available for both `Python` and `R`
+- **SEXTANT** products
+- **ODATIS-MR** products
+- Both **`R`** and **`Python`** workflows
+- Script-based use inside existing analysis pipelines
+- Command-line access for direct downloads and plotting
 
-# Validation
+> [!IMPORTANT]
+> Access to **ODATIS-MR** data requires an **AVISO+** account.  
+> You can create one for free here: [AVISO+ registration](https://www.aviso.altimetry.fr/en/data/data-access/registration-form.html)
 
-Note that an initial validation of all of the satellite products available via these scripts has been performed for the regions of study for RiOMar. Generally, for both SPM and CHl _a_, the data from the **ODATIS-MR** _MODIS_ sensor provide the closest matchups to _in situ_ measurements made for both the REPHY and SOMLIT networks. A close second (sometimes first) are the data from **SEXTANT** (one merged 'sensor'). Note that the data for MODIS have a 300 m resolution, while **SEXTANT** is 1 km. **SEXTANT** however is L4 (i.e. no gaps in the data), while MODIS is L3 (i.e. gaps due to cloud cover etc.). Meaning that, unless one has need for a high resolution analysis, the **SEXTANT** data will generally be easier to work with, while still providing an accurate estimate for SPM and Chl _a_ in the coastal zone. Also note that **SEXTANT** SPM also compares well against _in situ_ measured turbidity so may be used as a replacement if necessary.
+## 🚀 Two Ways To Use This Repository
 
-# Updates
+### 1. Script workflow
 
-## 2026-03-30
+Use:
 
--   Created Jupyter notebooks to provide examples for `R` and `Python` usage for the `sat_access` and `sat_access_script` workflows.
+- `sat_access_script.R`
+- `sat_access_script.py`
 
-## 2026-03-26
+These files are intended to be imported into a normal workflow so you can reuse the download and plotting functions directly in your own scripts or notebooks.
 
--   Expanded `sat_access_script.py` to have the same functionality as `sat_access_script.R`.
+Benefits:
 
-## 2026-03-03
+- ✅ Little to no setup
+- ✅ Easy to integrate into existing code
+- ✅ Good choice for most users
 
--   Created `sat_access_script.py`, which is similar to `sat_access_script.R` but with limited functionality.
+Example notebook:
 
-## 2026-03-03
+- [sat_access_script_examples.ipynb](https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_script_examples.ipynb)
 
--   Improved error trapping so a missing file on the server doesn't stop the entire download process.
+### 2. Command-line workflow
 
-## 2026-02-26
+Use:
 
--   Added username/password functionality for `ODATIS-MR` downloads.
+- `sat_access.R`
+- `sat_access.py`
 
-## 2026-02-12
+These scripts allow you to download **SEXTANT** NetCDF files for **Chl a** and/or **SPM**, and visualize a single day of data directly from the command line.
 
--   Added ability to subset `ODATIS-MR` files at the source via bounding box argument.
+> [!NOTE]
+> Running command-line requests in `R` may require more local setup than the script-based workflow.  
+> For most `R` users, `sat_access_script.R` is the better starting point.
 
-## 2026-01-22
+CLI usage notebook:
 
--   Added the ability to download all of the 8-day and monthly products within `ODATIS-MR` via `sat_access_script.R`.
--   Added the ability to plot all of the daily, 8-day, and monthly data files that can be downloaded via `sat_access_script.R`.
--   Created the __Updates__ section and populated it with the history of the project to date.
+- [sat_access_cli_usage.ipynb](https://github.com/RiOMar-projet/sat_access/blob/main/sat_access_cli_usage.ipynb)
 
-## 2026-01-21
+## 🌟 Features
 
--   Added the ability to download all of the daily products within `ODATIS-MR` via `sat_access_script.R`.
+- 📦 No installation required
+- ⬇️ Download a script and use it directly
+- 🌍 Download **SEXTANT** and **ODATIS-MR** NetCDF products
+- 🗺️ Extract and visualize selected dates, bounding boxes, and variables
+- 🐍 Available in `Python`
+- 📘 Available in `R`
 
-## 2025-01-19
+## ✅ Validation Notes
 
--   Updated __README__ documentation to cover the addition of `sat_access_script.R` to the project.
+An initial validation of the satellite products available through these scripts has been performed for the RiOMar study regions.
 
-## 2025-01-16
+Main takeaways:
 
-- Based on user feedback, created the `sat_access_script.R`, which is run like a 'traditional' R script and does not use the command line.
+- **ODATIS-MR MODIS** generally gives the closest matchups to *in situ* measurements from the **REPHY** and **SOMLIT** networks for both **SPM** and **Chl a**
+- **SEXTANT** is often a close second, and sometimes the best option
+- **MODIS** data have a **300 m** resolution
+- **SEXTANT** data have a **1 km** resolution
+- **SEXTANT** is **L4**, meaning gap-free fields
+- **MODIS** is **L3**, meaning gaps may occur because of cloud cover and related issues
 
-## 2025-01-15
+In practice:
 
--   Improved logic gates around the recognition of already downloaded files in `sat_access.R` and `sat_access.py`.
+- If you need finer spatial resolution, **MODIS** may be preferable
+- If you want easier day-to-day handling with fewer gaps, **SEXTANT** is often the more practical choice
+- **SEXTANT SPM** also compares well with *in situ* turbidity and may be used as a replacement where appropriate
 
-## 2025-01-15
+## 🗂️ Project Updates
 
--   Improved logic gates around the unzipping of files in `sat_access.R`.
+### 2026-03-30
 
-## 2025-12-17
+- Created Jupyter notebooks with usage examples for both the `sat_access` and `sat_access_script` workflows in `R` and `Python`
 
--   Extended functionality of `sat_access.py` to be able to concatenate daily files and create GIFs.
--   Updated documentation to match new arguments for `sat_access.py`.
--   Improved logic gates for handling various requests.
+### 2026-03-26
 
-## 2025-12-16
+- Expanded `sat_access_script.py` to reach feature parity with `sat_access_script.R`
 
--   Added __TO DO__ section.
+### 2026-03-03
 
-## 2025-11-26
+- Created `sat_access_script.py`, initially with limited functionality
+- Improved error trapping so a missing file on the server does not stop the full download process
 
--   Started `sat_access` project.
+### 2026-02-26
 
-# License
+- Added username/password support for `ODATIS-MR` downloads
 
-This script is provided as-is and is free to use via an [MIT License](https://github.com/RiOMar-projet/sat_access/blob/main/LICENSE).
+### 2026-02-12
+
+- Added source-side subsetting for `ODATIS-MR` files via bounding box arguments
+
+### 2026-01-22
+
+- Added support for downloading all 8-day and monthly `ODATIS-MR` products via `sat_access_script.R`
+- Added plotting support for all daily, 8-day, and monthly data files downloadable via `sat_access_script.R`
+- Created this **Updates** section and backfilled project history
+
+### 2026-01-21
+
+- Added support for downloading all daily `ODATIS-MR` products via `sat_access_script.R`
+
+### 2025-01-19
+
+- Updated the `README` to document the addition of `sat_access_script.R`
+
+### 2025-01-16
+
+- Created `sat_access_script.R` based on user feedback as a more traditional non-CLI `R` workflow
+
+### 2025-01-15
+
+- Improved logic for recognizing already-downloaded files in `sat_access.R` and `sat_access.py`
+- Improved logic for unzipping files in `sat_access.R`
+
+### 2025-12-17
+
+- Extended `sat_access.py` to support concatenating daily files and creating GIFs
+- Updated documentation to match new arguments in `sat_access.py`
+- Improved logic gates for handling various requests
+
+### 2025-12-16
+
+- Added a **TO DO** section
+
+### 2025-11-26
+
+- Started the `sat_access` project
+
+## 📄 License
+
+This project is provided as-is under the [MIT License](https://github.com/RiOMar-projet/sat_access/blob/main/LICENSE).  
 No liability is assumed and no warranty is provided.
 
-# Support
+## 📬 Support
 
-For questions or issues, please contact Robert Schlegel at: [robert.schlegel\@imev-mer.fr](mailto:robert.schlegel@imev-mer.fr){.email}
+For questions or issues, contact Robert Schlegel:
 
+- [robert.schlegel@imev-mer.fr](mailto:robert.schlegel@imev-mer.fr)
