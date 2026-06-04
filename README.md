@@ -22,12 +22,12 @@ It supports:
 
 ### 1. Script workflow
 
-Use:
+Download and use:
 
 - `sat_access_script.R`
 - `sat_access_script.py`
 
-These files are intended to be imported into a normal workflow so you can reuse the download and plotting functions directly in your own scripts or notebooks.
+These files are intended to be imported into a normal workflow so you can reuse the download and plotting functions directly in your own scripts or notebooks. No need to fork this repository or any other files therein.
 
 Benefits:
 
@@ -41,12 +41,12 @@ Example notebook:
 
 ### 2. Command-line workflow
 
-Use:
+Download and use:
 
 - `sat_access.R`
 - `sat_access.py`
 
-These scripts allow you to download **SEXTANT** NetCDF files for **Chl a** and/or **SPM**, and visualize a single day of data directly from the command line.
+These scripts allow you to download **SEXTANT** NetCDF files for **Chl a** and/or **SPM**, and visualize a single day of data directly from the command line. As with the other scripts, here is no need to download any other files. Just the one target file.
 
 > [!NOTE]
 > Running command-line requests in `R` may require more local setup than the script-based workflow.  
@@ -67,7 +67,7 @@ CLI usage notebook:
 
 ## ✅ Validation Notes
 
-An initial validation of the satellite products available through these scripts has been performed for the RiOMar study regions.
+An initial validation of the satellite products available through these scripts has been performed for the [RiOMar](https://github.com/RiOMar-projet) study regions.
 
 Main takeaways:
 
