@@ -69,22 +69,32 @@ CLI usage notebook:
 
 An initial validation of the satellite products available through these scripts has been performed for the [RiOMar](https://github.com/RiOMar-projet) study regions.
 
+An interactive webpage for these results may be found [here](https://htmlpreview.github.io/?https://github.com/RiOMar-projet/sat_access/blob/main/validation/results_report.html).
+
 Main takeaways:
 
-- **ODATIS-MR MODIS** generally gives the closest matchups to *in situ* measurements from the **REPHY** and **SOMLIT** networks for both **SPM** and **Chl a**
-- **SEXTANT** is often a close second, and sometimes the best option
-- **MODIS** data have a **300 m** resolution
+- **ODATIS-MR** gives the closest matchups to *in situ* measurements from the **REPHY** and **SOMLIT** networks for both **SPM** and **Chl a**, though this is usually not based on many matchups
+- The rough order of lowest to highest error is **OLCI-A**, **OLCI-B**, **MERIS**, **MODIS**, **SEXTANT**
+- Note however that certain atmospheric corrections and post-processings function notably better than others
+- **SEXTANT** tends to have higher error, but this is based on many more matchups
+- **ODATIS-MR** data have a **300 m** resolution
 - **SEXTANT** data have a **1 km** resolution
 - **SEXTANT** is **L4**, meaning gap-free fields
-- **MODIS** is **L3**, meaning gaps may occur because of cloud cover and related issues
+- **ODATIS-MR** is **L3**, meaning gaps may occur because of cloud cover and related issues
 
 In practice:
 
-- If you need finer spatial resolution, **MODIS** may be preferable
+- If you need finer spatial resolution and a long time series, **MODIS** may be preferable
+- If you want the product with the lowest general error, this is likely **OLCI-A**
+- If you want the product with the lowest error for a specific zone, study site, etc., refer to the [sumary](https://htmlpreview.github.io/?https://github.com/RiOMar-projet/sat_access/blob/main/validation/results_report.html)
 - If you want easier day-to-day handling with fewer gaps, **SEXTANT** is often the more practical choice
-- **SEXTANT SPM** also compares well with *in situ* turbidity and may be used as a replacement where appropriate
+- **SEXTANT SPM** also compares well with _in situ_ turbidity and may be used as a replacement where appropriate
 
 ## 🗂️ Project Updates
+
+### 2026-06-04
+
+- Created quarto document that provides a basic UI to the table of results for the satellite validation. 
 
 ### 2026-03-30
 

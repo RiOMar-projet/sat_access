@@ -233,7 +233,7 @@ Use the filters above each table to narrow by sensor, correction, processing, zo
 
 ## Scatterplots
 
-Scatterplots for the GLOBAL results are also available for every matchup shown in the first table below. These may be accessed via the GitHub interface directly within this folder.
+Scatterplots for the GLOBAL results are also available for every matchup shown in the first table below. These may be accessed via the GitHub interface directly within this [folder](https://github.com/RiOMar-projet/sat_access/tree/main/validation/scatterplot).
 
 ## GLOBAL and ALL Results
 
