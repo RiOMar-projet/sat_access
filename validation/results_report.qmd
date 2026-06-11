@@ -180,7 +180,9 @@ body .page-columns {
 </style>
 ```
 
-This report explains the validation results of a comparison of **SEXTANT** and **ODATIS-MR expert** products against _in situ_ data measured by the [REPHY](https://www.seanoe.org/data/00361/47248/) and [SOMLIT](https://www.somlit.fr/en/) networks. Each row compares a satellite product against in situ observations for a specific sensor, correction, processing chain, zone, source, site, season, measured _in situ_ variable, and the corresponding satellite variable.
+## Overview
+
+This report explains the validation results of a comparison of **SEXTANT** and **ODATIS-MR expert** products against _in situ_ data measured by the [REPHY](https://www.seanoe.org/data/00361/47248/) and [SOMLIT](https://www.somlit.fr/en/) networks. The coordinates for the sites named in the tables below may be found via the REPHY and SOMLIT databases. Each row compares a satellite product against in situ observations for a specific sensor, correction, processing chain, zone, source, site, season, measured _in situ_ variable, and the corresponding satellite variable.
 
 The data validated in this study were constrained to four of the French RiOMar, as seen below.
 
@@ -365,12 +367,12 @@ This final section contains the most detailed rows, where `site` is not `ALL`. T
 <script>
 (function () {
   const csvCandidates = ["table_all.csv", "validation/table_all.csv"];
-  const keyColumns = ["sensor", "correction", "processing", "grid_size", "zone", "source", "site", "season", "variable", "variable_sat"];
+  const keyColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable", "variable_sat"];
   //const preferredMetricColumns = ["n", "Slope", "Slope_log", "RMSE", "MSA", "MAPE", "Bias", "Error"];
   const preferredMetricColumns = ["n", "Bias", "Error", "Slope", "Slope_log"];
   const variableColors = { CHLA: "#e8f3d6", SPM: "#d8ecfb", TEMP: "#ffe5d6", TUR: "#f1e3ff" };
   const numericColumns = new Set(preferredMetricColumns);
-  const defaultFilterColumns = ["sensor", "correction", "processing", "grid_size", "zone", "source", "site", "season", "variable"];
+  const defaultFilterColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable"];
 
   function parseCsv(text) {
     const rows = [];

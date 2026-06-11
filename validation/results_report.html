@@ -49,7 +49,8 @@ ul.task-list li input[type="checkbox"] {
     <h2 id="toc-title">Table of contents</h2>
    
   <ul>
-  <li><a href="#how-to-read-the-tables" id="toc-how-to-read-the-tables" class="nav-link active" data-scroll-target="#how-to-read-the-tables">How to Read the Tables</a></li>
+  <li><a href="#overview" id="toc-overview" class="nav-link active" data-scroll-target="#overview">Overview</a></li>
+  <li><a href="#how-to-read-the-tables" id="toc-how-to-read-the-tables" class="nav-link" data-scroll-target="#how-to-read-the-tables">How to Read the Tables</a></li>
   <li><a href="#scatterplots" id="toc-scatterplots" class="nav-link" data-scroll-target="#scatterplots">Scatterplots</a></li>
   <li><a href="#global-and-all-results" id="toc-global-and-all-results" class="nav-link" data-scroll-target="#global-and-all-results">GLOBAL and ALL Results</a></li>
   <li><a href="#globalall-by-variable" id="toc-globalall-by-variable" class="nav-link" data-scroll-target="#globalall-by-variable">GLOBAL/ALL by Variable</a></li>
@@ -247,7 +248,9 @@ body .page-columns {
 }
 
 </style>
-<p>This report explains the validation results of a comparison of <strong>SEXTANT</strong> and <strong>ODATIS-MR expert</strong> products against <em>in situ</em> data measured by the <a href="https://www.seanoe.org/data/00361/47248/">REPHY</a> and <a href="https://www.somlit.fr/en/">SOMLIT</a> networks. Each row compares a satellite product against in situ observations for a specific sensor, correction, processing chain, zone, source, site, season, measured <em>in situ</em> variable, and the corresponding satellite variable.</p>
+<section id="overview" class="level2">
+<h2 class="anchored" data-anchor-id="overview">Overview</h2>
+<p>This report explains the validation results of a comparison of <strong>SEXTANT</strong> and <strong>ODATIS-MR expert</strong> products against <em>in situ</em> data measured by the <a href="https://www.seanoe.org/data/00361/47248/">REPHY</a> and <a href="https://www.somlit.fr/en/">SOMLIT</a> networks. The coordinates for the sites named in the tables below may be found via the REPHY and SOMLIT databases. Each row compares a satellite product against in situ observations for a specific sensor, correction, processing chain, zone, source, site, season, measured <em>in situ</em> variable, and the corresponding satellite variable.</p>
 <p>The data validated in this study were constrained to four of the French RiOMar, as seen below.</p>
 <div class="quarto-figure quarto-figure-center">
 <figure class="figure">
@@ -290,6 +293,7 @@ body .page-columns {
 <p><span class="variable-chip" style="background-color:#e8f3d6;">CHLA</span> <span class="variable-chip" style="background-color:#d8ecfb;">SPM</span> <span class="variable-chip" style="background-color:#ffe5d6;">TEMP</span> <span class="variable-chip" style="background-color:#f1e3ff;">TUR</span></p>
 </div>
 <p>These are chlorophyll, suspended particulate matter, temperature, and turbidity, respectively.</p>
+</section>
 <section id="how-to-read-the-tables" class="level2">
 <h2 class="anchored" data-anchor-id="how-to-read-the-tables">How to Read the Tables</h2>
 <p>Use the filters above each table to narrow by sensor, correction, processing, zone, source, site, season, or variable. Click column headers to sort. The CSV button downloads the currently filtered rows for that table. Rows are colored by the <code>variable</code> column so chlorophyll, suspended particulate matter, temperature, and turbidity comparisons remain easy to distinguish while scanning.</p>
@@ -485,12 +489,12 @@ body .page-columns {
 <script>
 (function () {
   const csvCandidates = ["table_all.csv", "validation/table_all.csv"];
-  const keyColumns = ["sensor", "correction", "processing", "grid_size", "zone", "source", "site", "season", "variable", "variable_sat"];
+  const keyColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable", "variable_sat"];
   //const preferredMetricColumns = ["n", "Slope", "Slope_log", "RMSE", "MSA", "MAPE", "Bias", "Error"];
   const preferredMetricColumns = ["n", "Bias", "Error", "Slope", "Slope_log"];
   const variableColors = { CHLA: "#e8f3d6", SPM: "#d8ecfb", TEMP: "#ffe5d6", TUR: "#f1e3ff" };
   const numericColumns = new Set(preferredMetricColumns);
-  const defaultFilterColumns = ["sensor", "correction", "processing", "grid_size", "zone", "source", "site", "season", "variable"];
+  const defaultFilterColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable"];
 
   function parseCsv(text) {
     const rows = [];
