@@ -69,7 +69,7 @@ CLI usage notebook:
 
 An initial validation of the satellite products available through these scripts has been performed for the [RiOMar](https://github.com/RiOMar-projet) study regions.
 
-An interactive webpage for these results may be found [here](https://htmlpreview.github.io/?https://github.com/RiOMar-projet/sat_access/blob/main/validation/results_report.html).
+An interactive webpage for these results may be found [here](https://riomar-projet.github.io/sat_access/validation/results_report.html).
 
 Main takeaways:
 

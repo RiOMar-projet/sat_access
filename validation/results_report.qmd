@@ -1,170 +1,152 @@
 ---
 title: "Satellite Validation Results"
-subtitle: "Interactive summary of sensor, correction, and processing comparisons for _in situ_ measured variables from differenet sourcees, seasons, and sites for four French RiOMar"
+subtitle: "Interactive summary of sensor, correction, and processing comparisons for _in situ_ measured variables from different sources, seasons, and sites for four French RiOMar"
 format:
   html:
+    theme: litera
+    embed-resources: true
     toc: true
     toc-depth: 3
-    theme: cosmo
     page-layout: full
+    fig-align: center
 execute:
   echo: false
+  warning: false
+  message: false
 ---
 
-```{=html}
+```{r setup}
+#| include: false
 
+# Required packages:
+#   install.packages(c("readr", "dplyr", "tidyr", "reactable", "writexl",
+#                      "plotly", "crosstalk", "htmltools", "scales"))
+
+library(readr)
+library(dplyr)
+library(tidyr)
+library(reactable)
+library(writexl)
+library(plotly)
+library(crosstalk)
+library(htmltools)
+library(scales)
+
+# "NA" is a real category in the `processing` column (meaning "no processing"),
+# not a missing value, so we tell readr not to treat it as one.
+df <- read_csv("table_all.csv", na = character(), show_col_types = FALSE) %>%
+  select(-grid_size)
+
+# With na = character(), readr cannot infer numeric types for columns that also
+# contain "NA" strings (Bias, Error, Slope, Slope_log, RMSE, MSA, MAPE all do).
+# Coerce them explicitly so summarise / mean() work correctly; "NA" strings
+# become proper NA_real_ values.
+df <- df %>%
+  mutate(across(c(Slope, Slope_log, RMSE, MSA, MAPE, Bias, Error),
+                ~suppressWarnings(as.numeric(.x))))
+
+variable_levels <- c("CHLA", "SPM", "TEMP", "TUR")
+variable_colors <- c(CHLA = "#e8f3d6", SPM = "#d8ecfb", TEMP = "#ffe5d6", TUR = "#f1e3ff")
+season_levels   <- c("ALL", "Spring", "Summer", "Autumn", "Winter")
+
+# Factor-encode categorical columns to keep level ordering consistent
+# across plots and to enable droplevels() on subsets.
+df <- df %>%
+  mutate(
+    sensor        = factor(sensor),
+    correction    = factor(correction),
+    processing    = factor(processing),
+    zone          = factor(zone),
+    source        = factor(source),
+    season        = factor(season, levels = season_levels),
+    variable      = factor(variable, levels = variable_levels),
+    variable_sat  = factor(variable_sat)
+  )
+
+metric_cols <- c("n", "Bias", "Error", "Slope", "Slope_log")
+display_cols <- c("sensor", "correction", "processing", "zone", "source",
+                   "site", "season", "variable", "variable_sat", metric_cols)
+
+# The broadest, cleanest rows in the dataset: one row per sensor / correction /
+# processing / variable combination, pooled across all sources, sites, and
+# seasons. This is the right granularity for summary bar charts -- mixing it
+# with the season- or site-level rows would double count the same underlying
+# matchups.
+df_global <- df %>%
+  filter(zone == "GLOBAL", source == "ALL", site == "ALL", season == "ALL") %>%
+  droplevels() %>%
+  mutate(
+    corr_proc = paste0(as.character(correction), " / ", as.character(processing)),
+    # Unique per-row label: sensor | correction / processing [variable_sat].
+    # Used as the bar-chart x axis so every bar is independent (no stacking).
+    bar_label = paste0(as.character(sensor), " | ", as.character(correction),
+                       " / ", as.character(processing),
+                       " [", as.character(variable_sat), "]")
+  )
+
+df_seasonal <- df %>%
+  filter(site == "ALL", season != "ALL") %>%
+  droplevels()
+
+n_all      <- nrow(df)
+n_overall  <- df %>% filter(zone == "GLOBAL", source == "ALL", site == "ALL", season == "ALL") %>% nrow()
+n_seasonal <- df %>% filter(site == "ALL", season != "ALL") %>% nrow()
+n_sites    <- df %>% filter(site != "ALL") %>% nrow()
+n_sensors  <- dplyr::n_distinct(df$sensor)
+n_site_ct  <- dplyr::n_distinct(df$site[df$site != "ALL"])
+
+# htmltools pretty-prints nested tags with indentation, and indented lines
+# read back through pandoc as a markdown code block (which escapes the tags
+# instead of rendering them). Collapsing to a single line avoids that.
+emit_html <- function(tag) cat(gsub("\n[ ]*", "", as.character(tag)))
+```
+
+```{=html}
 <style>
 
-.summary-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-  gap: 0.75rem;
-  margin: 1rem 0 1.5rem;
+:root {
+  --bg: #f3f5f8;
+  --card-bg: #ffffff;
+  --card-border: #e4e8ef;
+  --text: #232733;
+  --text-muted: #5c6470;
+  --accent: #2f7d77;
+  --accent-dark: #235f5a;
+  --accent-soft: #e4f2f0;
+  --radius: 12px;
+  --shadow: 0 1px 2px rgba(15,23,42,.06), 0 4px 14px rgba(15,23,42,.05);
 }
 
-.summary-box {
-  border: 1px solid #d9dee7;
-  border-radius: 6px;
-  padding: 0.8rem 0.95rem;
-  background: #f8fafc;
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  line-height: 1.62;
 }
 
-.summary-label {
-  display: block;
-  color: #596579;
-  font-size: 0.85rem;
-  margin-bottom: 0.25rem;
-}
+h1, h2, h3, h4 { color: var(--text); font-weight: 650; }
 
-.variable-key,
-.table-toolbar,
-.pager {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.5rem;
-  align-items: center;
-}
+a { color: var(--accent-dark); }
+a:hover { color: var(--accent); }
 
-.variable-key {
-  margin: 0.6rem 0 1.2rem;
-}
-
-.variable-chip {
-  border: 1px solid #cbd5e1;
-  border-radius: 6px;
-  padding: 0.25rem 0.5rem;
-  font-size: 0.9rem;
-}
-
-.result-table {
-  margin: 1rem 0 1.5rem;
-}
-
-.table-caption {
-  font-weight: 600;
-  margin-bottom: 0.5rem;
-}
-
-.table-toolbar {
-  border: 1px solid #d9dee7;
-  border-radius: 6px;
-  padding: 0.65rem;
-  background: #f8fafc;
-  margin-bottom: 0.6rem;
-}
-
-.table-toolbar label {
-  display: grid;
-  gap: 0.15rem;
-  font-size: 0.78rem;
-  color: #596579;
-}
-
-.table-toolbar input,
-.table-toolbar select {
-  min-width: 8.5rem;
-  border: 1px solid #cbd5e1;
-  border-radius: 5px;
-  padding: 0.28rem 0.4rem;
-  font-size: 0.85rem;
-  background: white;
-}
-
-.table-toolbar button,
-.pager button {
-  border: 1px solid #b8c2d2;
-  border-radius: 5px;
-  background: white;
-  padding: 0.32rem 0.55rem;
-  font-size: 0.85rem;
-  cursor: pointer;
-}
-
-.table-toolbar button:hover,
-.pager button:hover {
-  background: #eef2f7;
-}
-
-.table-scroll {
-  overflow-x: auto;
-  border: 1px solid #d9dee7;
-  border-radius: 6px;
-}
-
-table.interactive-results {
-  width: 100%;
-  min-width: 1200px;
-  border-collapse: collapse;
-  font-size: 0.86rem;
-}
-
-table.interactive-results th,
-table.interactive-results td {
-  border-bottom: 1px solid #e6ebf2;
-  padding: 0.36rem 0.45rem;
-  white-space: nowrap;
-}
-
-table.interactive-results th {
-  position: sticky;
-  top: 0;
-  z-index: 1;
-  background: #eef2f7;
-  color: #253044;
-  cursor: pointer;
-  user-select: none;
-}
-
-table.interactive-results tbody tr:hover td {
-  filter: brightness(0.97);
-}
-
-.pager {
-  justify-content: space-between;
-  margin-top: 0.55rem;
-  color: #596579;
-  font-size: 0.88rem;
-}
-
-.empty-note {
-  color: #596579;
-  font-style: italic;
-}
-
+/* narrower, centered framing instead of edge-to-edge */
 body #quarto-document-content,
 body .quarto-title-block,
 body #quarto-margin-sidebar,
 body .column-body,
 body .column-page,
 body .page-columns {
-  max-width: 100% !important;
+  max-width: 1220px !important;
   width: 100% !important;
-  padding-left: 1rem !important;
-  padding-right: 1rem !important;
+  margin-left: auto !important;
+  margin-right: auto !important;
+  padding-left: 1.25rem !important;
+  padding-right: 1.25rem !important;
 }
 
 body .page-columns {
-  grid-template-columns: 1fr 250px !important;
+  grid-template-columns: minmax(0, 1fr) 230px !important;
+  column-gap: 2rem;
 }
 
 #quarto-margin-sidebar {
@@ -177,6 +159,138 @@ body .page-columns {
   grid-row: 1 !important;
 }
 
+.quarto-title-block {
+  padding-bottom: 1.25rem;
+  margin-bottom: 0.5rem;
+  border-bottom: 1px solid var(--card-border);
+}
+
+.quarto-title-block .subtitle {
+  color: var(--text-muted);
+}
+
+/* every ## section becomes a card (pandoc wraps H2 sections in div.level2) */
+.level2 {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1.6rem 1.9rem;
+  margin: 1.75rem 0;
+}
+
+.level2 > h2 {
+  margin-top: 0;
+  padding-bottom: 0.6rem;
+  border-bottom: 2px solid var(--accent-soft);
+}
+
+.level2 h3 {
+  color: var(--accent-dark);
+}
+
+img {
+  border-radius: 8px;
+  box-shadow: var(--shadow);
+  border: 1px solid var(--card-border);
+}
+
+/* plain markdown tables (e.g. the metric-interpretation table) */
+table:not(.dataTable) {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+table:not(.dataTable) th,
+table:not(.dataTable) td {
+  border-bottom: 1px solid var(--card-border);
+  padding: 0.5rem 0.7rem;
+  text-align: left;
+}
+
+table:not(.dataTable) th {
+  background: var(--accent-soft);
+  color: var(--accent-dark);
+}
+
+.summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 0.85rem;
+  margin: 1rem 0 0.25rem;
+}
+
+.summary-box {
+  border: 1px solid var(--card-border);
+  border-radius: 10px;
+  padding: 0.85rem 1rem;
+  background: var(--accent-soft);
+}
+
+.summary-label {
+  display: block;
+  color: var(--text-muted);
+  font-size: 0.82rem;
+  margin-bottom: 0.25rem;
+}
+
+.summary-value {
+  font-size: 1.35rem;
+  font-weight: 700;
+  color: var(--accent-dark);
+}
+
+.variable-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin: 0.6rem 0 1rem;
+}
+
+.variable-chip {
+  border: 1px solid var(--card-border);
+  border-radius: 999px;
+  padding: 0.3rem 0.85rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.section-note {
+  color: var(--text-muted);
+  font-size: 0.92rem;
+}
+
+/* crosstalk filter widgets */
+.crosstalk-input {
+  margin-bottom: 0.9rem;
+}
+
+.crosstalk-input label {
+  font-size: 0.82rem;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+/* metric-switch buttons above the dashboard charts */
+.dash-metric-btns { margin: 0.75rem 0 0.5rem; }
+.dmb {
+  background: #f3f3f3;
+  border: 1px solid #c8c8c8;
+  border-radius: 3px;
+  padding: 0.3rem 0.9rem;
+  font-size: 0.85rem;
+  cursor: pointer;
+  margin-right: 0.3rem;
+  color: var(--text);
+}
+.dmb:hover { background: var(--accent-soft); }
+.dmb.active {
+  background: var(--accent);
+  color: #fff;
+  border-color: var(--accent-dark);
+}
+
 </style>
 ```
 
@@ -186,41 +300,44 @@ This report explains the validation results of a comparison of **SEXTANT** and *
 
 The data validated in this study were constrained to four of the French RiOMar, as seen below.
 
-![REPHY and SOMLIT stations validated in this report.](map_in_situ_stations.png){width=80%}
+![REPHY and SOMLIT stations validated in this report.](map_in_situ_stations.jpg){width=80%}
 
-The data from these stations were filtered to the dates and times when overhead satellite passes were available. For daytime values the time window was 10:00 to 14:00, and for nighttime values (SST only) this window was 00:00 to 09:00. Note that while 09:00 is a bit late into the morning, there were very few early morning measurements available for comparison otherwise. 
+The data from these stations were filtered to the dates and times when overhead satellite passes were available. For daytime values the time window was 10:00 to 14:00, and for nighttime values (SST only) this window was 00:00 to 09:00. Note that while 09:00 is a bit late into the morning, there were very few early morning measurements available for comparison otherwise.
 
-The satellites used here have two different resolutoins. **SEXTANT** is ~1 km, while **ODATIS-MR** is ~ 300 m. Therefore, for the **SEXTANT** data a 3x3 grid of pixels was extracted around each station, and for **ODATIS-MR** this was 7x7. In this way roughly a 1 km ring was extracted around each _in situ_ station for each matchup. Finally, the coefficient of variation (CV; standard deviation/ mean; %) was computed across all extracted pixels and any days with a CV >20% were discarded. The resulting paired satellite and in situ observations were then compared using a variety of metrics, which are presented in the tables below.
+The satellites used here have two different resolutions. **SEXTANT** is ~1 km, while **ODATIS-MR** is ~300 m. Therefore, for the **SEXTANT** data a 3x3 grid of pixels was extracted around each station, and for **ODATIS-MR** this was 7x7. In this way roughly a 1 km ring was extracted around each _in situ_ station for each matchup. Finally, the coefficient of variation (CV; standard deviation / mean; %) was computed across all extracted pixels and any days with a CV >20% were discarded. The resulting paired satellite and in situ observations were then compared using a variety of metrics, which are presented below.
 
-![REPHY and SOMLIT stations validated in this report.](all_sensors_time.png){width=80%}
+![Time coverage across all sensors.](all_sensors_time.jpg){width=80%}
 
-The broadest rows are presented first: `GLOBAL` zone, `ALL` source, `ALL` site, and `ALL` season. The document then moves into larger seasonal tables and finishes with the full site-level results.
+```{r summary-boxes}
+#| results: asis
 
-The row counts at a glance:
+summary_grid <- div(class = "summary-grid",
+  div(class = "summary-box", span(class = "summary-label", "Satellite Sensors"), div(class = "summary-value", comma(n_sensors))),
+  div(class = "summary-box", span(class = "summary-label", "In situ Sites"), div(class = "summary-value", comma(n_site_ct))),
+  div(class = "summary-box", span(class = "summary-label", "GLOBAL/ALL rows"), div(class = "summary-value", comma(n_overall))),
+  div(class = "summary-box", span(class = "summary-label", "Seasonal rows"), div(class = "summary-value", comma(n_seasonal))),
+  div(class = "summary-box", span(class = "summary-label", "Site-specific rows"), div(class = "summary-value", comma(n_sites))),
+  div(class = "summary-box", span(class = "summary-label", "All result rows"), div(class = "summary-value", comma(n_all)))
+)
+emit_html(summary_grid)
+```
 
-<div class="summary-grid">
-  <div class="summary-box"><span class="summary-label">All result rows</span><strong data-count="all">...</strong></div>
-  <div class="summary-box"><span class="summary-label">Broad GLOBAL/ALL rows</span><strong data-count="overall">...</strong></div>
-  <div class="summary-box"><span class="summary-label">Seasonal rows, site = ALL</span><strong data-count="seasonal">...</strong></div>
-  <div class="summary-box"><span class="summary-label">Site-specific rows</span><strong data-count="sites">...</strong></div>
-  <div class="summary-box"><span class="summary-label">Sensors</span><strong data-count="sensors">...</strong></div>
-  <div class="summary-box"><span class="summary-label">Sites, excluding ALL</span><strong data-count="site-count">...</strong></div>
-</div>
+The rows and charts below are colour coded by the _in situ_ variable used for the comparison:
 
-The rows below are colour coded by the _in situ_ variables used for the comparisons:
+```{r variable-key}
+#| results: asis
 
-<div class="variable-key">
-  <span class="variable-chip" style="background-color:#e8f3d6;">CHLA</span>
-  <span class="variable-chip" style="background-color:#d8ecfb;">SPM</span>
-  <span class="variable-chip" style="background-color:#ffe5d6;">TEMP</span>
-  <span class="variable-chip" style="background-color:#f1e3ff;">TUR</span>
-</div>
+chips <- lapply(variable_levels, function(v) {
+  span(class = "variable-chip", style = paste0("background-color:", variable_colors[[v]], ";"), v)
+})
+emit_html(div(class = "variable-key", chips))
+```
 
-These are chlorophyll, suspended particulate matter, temperature, and turbidity, respectively.
+These are chlorophyll (CHLA), suspended particulate matter (SPM), temperature (TEMP), and turbidity (TUR), respectively.
 
-## How to Read the Tables
+## How to Read the Results
 
-Use the filters above each table to narrow by sensor, correction, processing, zone, source, site, season, or variable. Click column headers to sort. The CSV button downloads the currently filtered rows for that table. Rows are colored by the `variable` column so chlorophyll, suspended particulate matter, temperature, and turbidity comparisons remain easy to distinguish while scanning.
+The results table further down lets you filter by sensor, correction, processing, zone, source, site, season, and variable using the boxes under each column header, and sort by clicking a column header. Rows are coloured by the `variable` column. The `Export` button above the table downloads the currently filtered rows as CSV or Excel.
 
 | Metric | Interpretation |
 |---|---|
@@ -229,399 +346,460 @@ Use the filters above each table to narrow by sensor, correction, processing, zo
 | `Error` | Mean unsigned percentage error. |
 | `Slope` | Linear slope between satellite and in situ values. Values near 1 indicate proportional agreement. |
 | `Slope_log` | Slope after log transformation of the data. Ideal for non-temperature data. |
-<!-- | `RMSE` | Root mean squared error. Smaller values indicate lower absolute error. | -->
-<!-- | `MSA` | Multiplicative symmetric accuracy. Values closer to 1 indicate better agreement. | -->
-<!-- | `MAPE` | Mean absolute percentage error. Smaller values indicate lower relative error. | -->
 
 ## Scatterplots
 
-Scatterplots for the GLOBAL results are also available for every matchup shown in the first table below. These may be accessed via the GitHub interface directly within this [folder](https://github.com/RiOMar-projet/sat_access/tree/main/validation/scatterplot).
+Scatterplots for the GLOBAL results are available for every matchup shown in the summary dashboard below. These may be accessed via the GitHub interface directly within this [folder](https://github.com/RiOMar-projet/sat_access/tree/main/validation/scatterplot).
 
-## GLOBAL and ALL Results
+## Summary Dashboard
 
-These tabs start with the broadest possible summary rows and then open into the next-most-general summaries by source and by zone.
+Sensors are compared on the x-axis; bars are coloured by variable. Each distinct correction / processing combination produces its own dodged bar, labelled above. Use the four filter boxes to select which sensors, corrections, processing chains, and variables to include; the **Bias / Error / Slope** buttons switch the metric shown. Click a variable in the legend to show or hide it.
 
-::: {.panel-tabset}
+```{r dashboard-setup}
+#| include: false
 
-### Overall GLOBAL/ALL
+# One row per (sensor, variable, correction, processing) combination.
+# The one case where the same combo has two satellite variables (MODIS/NS/NA/TEMP:
+# SST day vs night) is averaged so each position has at most one bar.
+df_dash <- df_global %>%
+  group_by(sensor, variable, correction, processing, corr_proc) %>%
+  summarise(
+    Bias  = mean(Bias,  na.rm = TRUE),
+    Error = mean(Error, na.rm = TRUE),
+    Slope = mean(Slope, na.rm = TRUE),
+    .groups = "drop"
+  ) %>%
+  mutate(.key = paste0(as.character(variable), "_",
+                       as.character(sensor), "_",
+                       as.character(corr_proc)))
 
-`GLOBAL` zone, `ALL` source, `ALL` site, and `ALL` season. This is the best first stop for comparing sensors and processing choices at the most general level.
+# Single SharedData that drives all four filter widgets and all three charts.
+sd_full <- SharedData$new(df_dash, key = ~.key, group = "dash")
 
-<div class="result-table" data-slice="overall" data-caption="GLOBAL zone, ALL source, ALL site, ALL season"></div>
+# Each unique (variable, corr_proc) pair becomes one dodged bar trace so
+# different correction / processing combos sit side-by-side at each sensor.
+trace_combos <- df_dash %>%
+  select(variable, corr_proc) %>%
+  distinct() %>%
+  arrange(variable, corr_proc)
 
-### GLOBAL by Source
+# Only the first trace per variable gets a legend entry; all share a legendgroup
+# so clicking the variable label in the legend toggles all its traces at once.
+vars_seen <- character(0)
+show_leg  <- logical(nrow(trace_combos))
+for (i in seq_len(nrow(trace_combos))) {
+  v           <- as.character(trace_combos$variable[i])
+  show_leg[i] <- !(v %in% vars_seen)
+  vars_seen   <- union(vars_seen, v)
+}
 
-`GLOBAL` zone with `ALL` site and `ALL` season, retaining source-specific rows. Use this to see whether the broad results differ between the full source pool and individual in situ networks.
+make_sensor_chart <- function(y_col, y_label, y_fmt = ".3f") {
+  fig <- plot_ly()
+  for (i in seq_len(nrow(trace_combos))) {
+    v  <- as.character(trace_combos$variable[i])
+    cp <- as.character(trace_combos$corr_proc[i])
+    sub_df <- df_dash %>% filter(variable == v, corr_proc == cp)
+    sd_sub <- SharedData$new(sub_df, key = ~.key, group = "dash")
+    fig <- fig %>% add_trace(
+      data          = sd_sub,
+      type          = "bar",
+      name          = v,
+      legendgroup   = v,
+      showlegend    = show_leg[i],
+      x             = ~sensor,
+      y             = as.formula(paste0("~", y_col)),
+      marker        = list(color = variable_colors[[v]]),
+      text          = cp,
+      textposition  = "outside",
+      textfont      = list(size = 8),
+      hovertemplate = paste0(
+        "<b>%{x}</b><br>",
+        cp, "<br>",
+        y_label, ": %{y:", y_fmt, "}",
+        "<extra>", v, "</extra>"
+      )
+    )
+  }
+  fig %>%
+    layout(
+      barmode     = "group",
+      yaxis       = list(title = y_label, type = "linear", rangemode = "tozero"),
+      xaxis       = list(title = "", type = "category"),
+      legend      = list(orientation = "h", y = -0.25,
+                         title = list(text = "Variable (click to toggle)")),
+      margin      = list(t = 40, b = 100),
+      uniformtext = list(minsize = 6, mode = "hide")
+    ) %>%
+    config(displaylogo = FALSE)
+}
+```
 
-<div class="result-table" data-slice="global-source" data-caption="GLOBAL zone by source, with ALL site and ALL season"></div>
-
-### ALL Source by Zone
-
-`ALL` source, `ALL` site, and `ALL` season, retaining zone-specific rows. Use this to compare broad regional behavior before moving into seasons and sites.
-
-<div class="result-table" data-slice="zone-all" data-caption="ALL source by zone, with ALL site and ALL season"></div>
-
-:::
-
-## GLOBAL/ALL by Variable
-
-The same broad `GLOBAL` and `ALL` rows are split by variable here. This is useful to look at only one type of water-colour or temperature product.
-
-::: {.panel-tabset}
-
-### CHLA
-
-<div class="result-table" data-slice="overall" data-variable="CHLA" data-caption="GLOBAL/ALL results for CHLA"></div>
-
-### SPM
-
-<div class="result-table" data-slice="overall" data-variable="SPM" data-caption="GLOBAL/ALL results for SPM"></div>
-
-### TEMP
-
-<div class="result-table" data-slice="overall" data-variable="TEMP" data-caption="GLOBAL/ALL results for TEMP"></div>
-
-### TUR
-
-<div class="result-table" data-slice="overall" data-variable="TUR" data-caption="GLOBAL/ALL results for TUR"></div>
-
-:::
-
-## Seasonal Results
-
-The seasonal tables keep `site == "ALL"` and show season-specific rows. They are larger than the global overview because they retain the seasonal split while still avoiding individual-site detail.
-
-::: {.panel-tabset}
-
-### Spring
-
-<div class="result-table" data-slice="season" data-season="Spring" data-caption="Seasonal results for Spring with site = ALL" data-page-size="50"></div>
-
-### Summer
-
-<div class="result-table" data-slice="season" data-season="Summer" data-caption="Seasonal results for Summer with site = ALL" data-page-size="50"></div>
-
-### Autumn
-
-<div class="result-table" data-slice="season" data-season="Autumn" data-caption="Seasonal results for Autumn with site = ALL" data-page-size="50"></div>
-
-### Winter
-
-<div class="result-table" data-slice="season" data-season="Winter" data-caption="Seasonal results for Winter with site = ALL" data-page-size="50"></div>
-
-:::
-
-## Seasonal Results by Variable
-
-This section keeps the seasonal rows but separates them by `variable`, which makes it easier to compare seasonal behavior within one measurement type.
-
-::: {.panel-tabset}
-
-### CHLA
-
-<div class="result-table" data-slice="seasonal-variable" data-variable="CHLA" data-caption="All seasonal rows for CHLA" data-page-size="50"></div>
-
-### SPM
-
-<div class="result-table" data-slice="seasonal-variable" data-variable="SPM" data-caption="All seasonal rows for SPM" data-page-size="50"></div>
-
-### TEMP
-
-<div class="result-table" data-slice="seasonal-variable" data-variable="TEMP" data-caption="All seasonal rows for TEMP" data-page-size="50"></div>
-
-### TUR
-
-<div class="result-table" data-slice="seasonal-variable" data-variable="TUR" data-caption="All seasonal rows for TUR" data-page-size="50"></div>
-
-:::
-
-## Site-Level Results
-
-This final section contains the most detailed rows, where `site` is not `ALL`. These tables are intentionally large and are best explored with the column filters.
-
-::: {.panel-tabset}
-
-### All Sites
-
-<div class="result-table" data-slice="sites" data-caption="All site-specific validation rows" data-page-size="50"></div>
-
-### CHLA
-
-<div class="result-table" data-slice="site-variable" data-variable="CHLA" data-caption="Site-specific rows for CHLA" data-page-size="50"></div>
-
-### SPM
-
-<div class="result-table" data-slice="site-variable" data-variable="SPM" data-caption="Site-specific rows for SPM" data-page-size="50"></div>
-
-### TEMP
-
-<div class="result-table" data-slice="site-variable" data-variable="TEMP" data-caption="Site-specific rows for TEMP" data-page-size="50"></div>
-
-### TUR
-
-<div class="result-table" data-slice="site-variable" data-variable="TUR" data-caption="Site-specific rows for TUR" data-page-size="50"></div>
-
-:::
+```{r dashboard-filter}
+bscols(
+  widths = c(3, 3, 3, 3),
+  filter_select("f-var-dash",  "Variable",   sd_full, ~variable),
+  filter_select("f-sens-dash", "Sensor",     sd_full, ~sensor),
+  filter_select("f-corr-dash", "Correction", sd_full, ~correction),
+  filter_select("f-proc-dash", "Processing", sd_full, ~processing)
+)
+```
 
 ```{=html}
+<div class="dash-metric-btns">
+  <button class="dmb active" onclick="dashSwitch(this,'dash-bias')">Bias</button>
+  <button class="dmb" onclick="dashSwitch(this,'dash-error')">Error (%)</button>
+  <button class="dmb" onclick="dashSwitch(this,'dash-slope')">Slope</button>
+</div>
+<div id="dash-bias">
+```
+
+```{r dashboard-bias}
+make_sensor_chart("Bias", "Bias", ".0f")
+```
+
+```{=html}
+</div>
+<div id="dash-error" style="display:none">
+```
+
+```{r dashboard-error}
+make_sensor_chart("Error", "Error (%)", ".0f")
+```
+
+```{=html}
+</div>
+<div id="dash-slope" style="display:none">
+```
+
+```{r dashboard-slope}
+make_sensor_chart("Slope", "Slope", ".2f")
+```
+
+```{=html}
+</div>
 <script>
-(function () {
-  const csvCandidates = ["table_all.csv", "validation/table_all.csv"];
-  const keyColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable", "variable_sat"];
-  //const preferredMetricColumns = ["n", "Slope", "Slope_log", "RMSE", "MSA", "MAPE", "Bias", "Error"];
-  const preferredMetricColumns = ["n", "Bias", "Error", "Slope", "Slope_log"];
-  const variableColors = { CHLA: "#e8f3d6", SPM: "#d8ecfb", TEMP: "#ffe5d6", TUR: "#f1e3ff" };
-  const numericColumns = new Set(preferredMetricColumns);
-  const defaultFilterColumns = ["sensor", "correction", "processing", "zone", "source", "site", "season", "variable"];
-
-  function parseCsv(text) {
-    const rows = [];
-    let row = [];
-    let value = "";
-    let inQuotes = false;
-    for (let i = 0; i < text.length; i += 1) {
-      const char = text[i];
-      const next = text[i + 1];
-      if (char === '"' && inQuotes && next === '"') {
-        value += '"';
-        i += 1;
-      } else if (char === '"') {
-        inQuotes = !inQuotes;
-      } else if (char === "," && !inQuotes) {
-        row.push(value);
-        value = "";
-      } else if ((char === "\n" || char === "\r") && !inQuotes) {
-        if (char === "\r" && next === "\n") i += 1;
-        row.push(value);
-        if (row.some((cell) => cell !== "")) rows.push(row);
-        row = [];
-        value = "";
-      } else {
-        value += char;
-      }
-    }
-    if (value !== "" || row.length > 0) {
-      row.push(value);
-      rows.push(row);
-    }
-    const headers = rows.shift();
-    return rows.map((cells) => Object.fromEntries(headers.map((header, index) => [header, cells[index] || ""])));
-  }
-
-  async function loadCsv() {
-    const errors = [];
-    for (const path of csvCandidates) {
-      try {
-        const response = await fetch(path);
-        if (response.ok) return parseCsv(await response.text());
-        errors.push(path + " returned " + response.status);
-      } catch (error) {
-        errors.push(path + " failed: " + error.message);
-      }
-    }
-    throw new Error(errors.join("; "));
-  }
-
-  function orderedColumns(rows) {
-    const seen = new Set(rows.flatMap((row) => Object.keys(row)));
-    const preferred = [...keyColumns, ...preferredMetricColumns].filter((column) => seen.has(column));
-    // const rest = [...seen].filter((column) => !preferred.includes(column));
-    return [...preferred]//, ...rest];
-  }
-
-  function sliceRows(rows, mount) {
-    const slice = mount.dataset.slice;
-    const variable = mount.dataset.variable;
-    const season = mount.dataset.season;
-    return rows.filter((row) => {
-      if (variable && row.variable !== variable) return false;
-      if (season && row.season !== season) return false;
-      if (slice === "overall") return row.zone === "GLOBAL" && row.source === "ALL" && row.site === "ALL" && row.season === "ALL";
-      if (slice === "global-source") return row.zone === "GLOBAL" && row.site === "ALL" && row.season === "ALL";
-      if (slice === "zone-all") return row.source === "ALL" && row.site === "ALL" && row.season === "ALL";
-      if (slice === "season") return row.site === "ALL" && row.season !== "ALL";
-      if (slice === "seasonal-variable") return row.site === "ALL" && row.season !== "ALL";
-      if (slice === "sites") return row.site !== "ALL";
-      if (slice === "site-variable") return row.site !== "ALL";
-      return true;
-    });
-  }
-
-  function uniqueSorted(rows, column) {
-    return [...new Set(rows.map((row) => row[column]).filter(Boolean))].sort((a, b) => a.localeCompare(b));
-  }
-
-  function escapeHtml(value) {
-    return String(value ?? "").replaceAll("&", "&amp;").replaceAll("<", "&lt;").replaceAll(">", "&gt;").replaceAll('"', "&quot;").replaceAll("'", "&#039;");
-  }
-
-  function formatCell(column, value) {
-    if (!numericColumns.has(column) || value === "") return escapeHtml(value);
-    const number = Number(value);
-    if (!Number.isFinite(number)) return escapeHtml(value);
-    if (column === "n") return number.toLocaleString();
-    return number.toLocaleString(undefined, { maximumFractionDigits: 3 });
-  }
-
-  function csvEscape(value) {
-    const stringValue = String(value ?? "");
-    if (/[",\n\r]/.test(stringValue)) return '"' + stringValue.replaceAll('"', '""') + '"';
-    return stringValue;
-  }
-
-  function downloadCsv(rows, columns, caption) {
-    const csv = [columns.map(csvEscape).join(","), ...rows.map((row) => columns.map((column) => csvEscape(row[column])).join(","))].join("\n");
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = caption.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") + ".csv";
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-  }
-
-  function createInteractiveTable(mount, sourceRows) {
-    const rows = sliceRows(sourceRows, mount);
-    const caption = mount.dataset.caption || "Validation results";
-    const columns = orderedColumns(rows.length > 0 ? rows : sourceRows);
-    const pageSize = Number(mount.dataset.pageSize || 25);
-    const state = { search: "", filters: {}, sortColumn: "variable", sortDirection: "asc", page: 1 };
-    if (rows.length === 0) {
-      mount.innerHTML = '<p class="empty-note">No rows are available for this selection.</p>';
-      return;
-    }
-
-    mount.innerHTML = "";
-    const captionEl = document.createElement("div");
-    captionEl.className = "table-caption";
-    captionEl.textContent = caption;
-    const toolbar = document.createElement("div");
-    toolbar.className = "table-toolbar";
-    const searchLabel = document.createElement("label");
-    searchLabel.textContent = "Search";
-    const searchInput = document.createElement("input");
-    searchInput.type = "search";
-    searchInput.placeholder = "Any column";
-    searchInput.addEventListener("input", () => { state.search = searchInput.value.toLowerCase(); state.page = 1; render(); });
-    searchLabel.appendChild(searchInput);
-    toolbar.appendChild(searchLabel);
-
-    defaultFilterColumns.filter((column) => columns.includes(column)).forEach((column) => {
-      const values = uniqueSorted(rows, column);
-      if (values.length <= 1) return;
-      const label = document.createElement("label");
-      label.textContent = column;
-      const select = document.createElement("select");
-      select.innerHTML = '<option value="">All</option>' + values.map((value) => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
-      select.addEventListener("change", () => { state.filters[column] = select.value; state.page = 1; render(); });
-      label.appendChild(select);
-      toolbar.appendChild(label);
-    });
-
-    const exportButton = document.createElement("button");
-    exportButton.type = "button";
-    exportButton.textContent = "CSV";
-    exportButton.addEventListener("click", () => downloadCsv(filteredRows(), columns, caption));
-    toolbar.appendChild(exportButton);
-    const scroll = document.createElement("div");
-    scroll.className = "table-scroll";
-    const table = document.createElement("table");
-    table.className = "interactive-results";
-    scroll.appendChild(table);
-    const pager = document.createElement("div");
-    pager.className = "pager";
-    const pagerInfo = document.createElement("span");
-    const pagerControls = document.createElement("span");
-    const prevButton = document.createElement("button");
-    prevButton.type = "button";
-    prevButton.textContent = "Previous";
-    const nextButton = document.createElement("button");
-    nextButton.type = "button";
-    nextButton.textContent = "Next";
-    prevButton.addEventListener("click", () => { state.page = Math.max(1, state.page - 1); render(); });
-    nextButton.addEventListener("click", () => { state.page += 1; render(); });
-    pagerControls.append(prevButton, nextButton);
-    pager.append(pagerInfo, pagerControls);
-    mount.append(captionEl, toolbar, scroll, pager);
-
-    function filteredRows() {
-      return rows.filter((row) => {
-        const matchesSearch = !state.search || columns.some((column) => String(row[column] || "").toLowerCase().includes(state.search));
-        if (!matchesSearch) return false;
-        return Object.entries(state.filters).every(([column, value]) => !value || row[column] === value);
-      }).sort((a, b) => {
-        const leftRaw = a[state.sortColumn] ?? "";
-        const rightRaw = b[state.sortColumn] ?? "";
-        const leftNumber = Number(leftRaw);
-        const rightNumber = Number(rightRaw);
-        let comparison;
-        if (Number.isFinite(leftNumber) && Number.isFinite(rightNumber) && leftRaw !== "" && rightRaw !== "") comparison = leftNumber - rightNumber;
-        else comparison = String(leftRaw).localeCompare(String(rightRaw));
-        return state.sortDirection === "asc" ? comparison : -comparison;
-      });
-    }
-
-    function render() {
-      const filtered = filteredRows();
-      const pageCount = Math.max(1, Math.ceil(filtered.length / pageSize));
-      state.page = Math.min(state.page, pageCount);
-      const start = (state.page - 1) * pageSize;
-      const visibleRows = filtered.slice(start, start + pageSize);
-      const thead = "<thead><tr>" + columns.map((column) => {
-        const marker = state.sortColumn === column ? (state.sortDirection === "asc" ? " ^" : " v") : "";
-        return `<th data-column="${escapeHtml(column)}">${escapeHtml(column)}${marker}</th>`;
-      }).join("") + "</tr></thead>";
-      const tbody = "<tbody>" + visibleRows.map((row) => {
-        const color = variableColors[row.variable] || "#ffffff";
-        const cells = columns.map((column) => `<td>${formatCell(column, row[column] ?? "")}</td>`).join("");
-        return `<tr style="background-color:${color};">${cells}</tr>`;
-      }).join("") + "</tbody>";
-      table.innerHTML = thead + tbody;
-      table.querySelectorAll("th").forEach((th) => {
-        th.addEventListener("click", () => {
-          const column = th.dataset.column;
-          if (state.sortColumn === column) state.sortDirection = state.sortDirection === "asc" ? "desc" : "asc";
-          else { state.sortColumn = column; state.sortDirection = "asc"; }
-          render();
-        });
-      });
-      const end = Math.min(start + pageSize, filtered.length);
-      pagerInfo.textContent = `${filtered.length.toLocaleString()} rows; showing ${filtered.length === 0 ? 0 : start + 1}-${end}`;
-      prevButton.disabled = state.page <= 1;
-      nextButton.disabled = state.page >= pageCount;
-    }
-    render();
-  }
-
-  function setCount(name, value) {
-    document.querySelectorAll(`[data-count="${name}"]`).forEach((element) => { element.textContent = Number(value).toLocaleString(); });
-  }
-
-  function fillSummary(rows) {
-    const overall = rows.filter((row) => row.zone === "GLOBAL" && row.source === "ALL" && row.site === "ALL" && row.season === "ALL");
-    const seasonal = rows.filter((row) => row.site === "ALL" && row.season !== "ALL");
-    const sites = rows.filter((row) => row.site !== "ALL");
-    setCount("all", rows.length);
-    setCount("overall", overall.length);
-    setCount("seasonal", seasonal.length);
-    setCount("sites", sites.length);
-    setCount("sensors", new Set(rows.map((row) => row.sensor)).size);
-    setCount("site-count", new Set(sites.map((row) => row.site)).size);
-  }
-
-  document.addEventListener("DOMContentLoaded", async () => {
-    try {
-      const rows = await loadCsv();
-      fillSummary(rows);
-      document.querySelectorAll(".result-table").forEach((mount) => createInteractiveTable(mount, rows));
-    } catch (error) {
-      document.querySelectorAll(".result-table").forEach((mount) => {
-        mount.innerHTML = `<p class="empty-note">Could not load table_all.csv: ${escapeHtml(error.message)}</p>`;
-      });
-    }
+function dashSwitch(btn, id) {
+  ['dash-bias', 'dash-error', 'dash-slope'].forEach(function(x) {
+    document.getElementById(x).style.display = (x === id ? 'block' : 'none');
   });
-})();
+  document.querySelectorAll('.dash-metric-btns .dmb').forEach(function(b) {
+    b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  // Resize the newly visible plotly chart (avoids blank-on-first-show).
+  var pd = document.querySelector('#' + id + ' .plotly-graph-div');
+  if (pd && window.Plotly) Plotly.Plots.resize(pd);
+}
 </script>
+```
+
+### Seasonal Summary
+
+Distribution of Bias values by season (`site = ALL`). Linked to the dashboard filters above: selecting a sensor, correction, or processing combination updates this chart to show only matching matchups.
+
+```{r seasonal-summary}
+seasonal_linked <- df_seasonal %>%
+  mutate(
+    corr_proc = paste0(as.character(correction), " / ", as.character(processing)),
+    .key      = paste0(as.character(variable), "_", as.character(sensor), "_", corr_proc),
+    season    = factor(as.character(season), levels = c("Spring", "Summer", "Autumn", "Winter"))
+  )
+sd_seasonal <- SharedData$new(seasonal_linked, key = ~.key, group = "dash")
+
+plot_ly(sd_seasonal,
+        x = ~season, y = ~Bias, color = ~variable, colors = variable_colors,
+        type = "box") %>%
+  layout(
+    boxmode = "group",
+    yaxis   = list(title = "Bias", type = "linear", rangemode = "tozero"),
+    xaxis   = list(title = "", type = "category",
+                   categoryorder = "array",
+                   categoryarray = c("Spring", "Summer", "Autumn", "Winter")),
+    legend  = list(orientation = "h", y = -0.2),
+    margin  = list(t = 10)
+  ) %>%
+  config(displaylogo = FALSE)
+```
+
+## Explore by Metric
+
+Pick a metric and a grouping variable to explore the same GLOBAL/ALL summary rows from a different angle.
+
+```{r explore-panel}
+group_vars <- c("sensor", "correction", "processing", "variable")
+metric_choices <- c("Bias", "Error", "Slope", "Slope_log")
+
+combos <- expand.grid(metric = metric_choices, group = group_vars, stringsAsFactors = FALSE)
+
+traces <- lapply(seq_len(nrow(combos)), function(i) {
+  metric <- combos$metric[i]
+  group  <- combos$group[i]
+  agg <- df_global %>%
+    group_by(.data[[group]]) %>%
+    summarise(value = mean(.data[[metric]], na.rm = TRUE), .groups = "drop")
+  list(
+    x = as.character(agg[[group]]),
+    y = agg$value,
+    metric = metric,
+    group = group,
+    title = paste0("Mean ", metric, " by ", group)
+  )
+})
+
+fig <- plot_ly()
+for (i in seq_along(traces)) {
+  tr <- traces[[i]]
+  fig <- fig %>% add_bars(
+    x = tr$x, y = tr$y,
+    name = tr$title,
+    marker = list(color = "#2f7d77"),
+    visible = (i == 1)
+  )
+}
+
+buttons <- lapply(seq_along(traces), function(i) {
+  visible <- rep(FALSE, length(traces))
+  visible[i] <- TRUE
+  list(
+    method = "update",
+    args = list(
+      list(visible = visible),
+      list(title = traces[[i]]$title, "yaxis.title" = traces[[i]]$metric)
+    ),
+    label = traces[[i]]$title
+  )
+})
+
+fig %>%
+  layout(
+    title = traces[[1]]$title,
+    yaxis = list(title = traces[[1]]$metric),
+    xaxis = list(title = ""),
+    margin = list(t = 60),
+    updatemenus = list(
+      list(
+        active = 0,
+        x = 0, xanchor = "left",
+        y = 1.18, yanchor = "top",
+        buttons = buttons
+      )
+    )
+  ) %>%
+  config(displaylogo = FALSE)
+```
+
+## Results Table
+
+All `r comma(n_all)` validation rows. The first three columns (sensor, corr., proc.) are pinned and remain visible while scrolling right — "corr." and "proc." are abbreviations for correction and processing. Categorical columns show tick-boxes; select any combination to filter by multiple values simultaneously. Metric columns (n, Bias, Error, Slope, Slope_log) show Min / Max numeric entry boxes; the site column accepts free text. Click any header to sort. The CSV button exports the currently filtered rows; the Excel button downloads the full dataset. Rows with empty metric values indicate that too few matchups existed for that sensor / site / season combination to compute reliable statistics. Rows are coloured by `variable`: <span class="variable-chip" style="background-color:#e8f3d6;">CHLA</span> <span class="variable-chip" style="background-color:#d8ecfb;">SPM</span> <span class="variable-chip" style="background-color:#ffe5d6;">TEMP</span> <span class="variable-chip" style="background-color:#f1e3ff;">TUR</span>.
+
+```{r results-table}
+tbl_data <- df[, display_cols]
+
+# Pre-render Excel for the download button (full dataset, all rows).
+tmp_xlsx <- tempfile(fileext = ".xlsx")
+write_xlsx(tbl_data, tmp_xlsx)
+xlsx_href <- paste0(
+  "data:application/vnd.openxmlformats-officedocument.spreadsheetml.sheet;base64,",
+  base64enc::base64encode(tmp_xlsx)
+)
+unlink(tmp_xlsx)
+
+btn_style <- paste(
+  "padding:0.3rem 0.9rem; font-size:0.85rem; cursor:pointer;",
+  "background:#f3f3f3; border:1px solid #c8c8c8; border-radius:3px;",
+  "text-decoration:none; color:inherit; display:inline-block; margin-right:0.4rem;"
+)
+
+dl_row <- div(
+  style = "margin-bottom:0.6rem;",
+  tags$button(
+    "CSV (filtered rows)",
+    style = btn_style,
+    onclick = "Reactable.downloadDataCSV('results-tbl', 'validation_results.csv')"
+  ),
+  tags$a(
+    "Excel (all rows)",
+    href     = xlsx_href,
+    download = "validation_results.xlsx",
+    style    = btn_style
+  )
+)
+
+# JS helper functions injected once alongside the reactable widget.
+tbl_js <- tags$script(HTML('
+function updateCheckFilter(tableId, columnId, containerId) {
+  var c = document.getElementById(containerId);
+  var checked = Array.from(c.querySelectorAll("input:checked"))
+                     .map(function(el) { return el.value; });
+  Reactable.setFilter(tableId, columnId, checked.length > 0 ? checked : undefined);
+}
+function updateRangeFilter(tableId, columnId, containerId) {
+  var c     = document.getElementById(containerId);
+  var loStr = c.querySelector(".rng-lo").value;
+  var hiStr = c.querySelector(".rng-hi").value;
+  var lo    = loStr === "" ? -Infinity : parseFloat(loStr);
+  var hi    = hiStr === "" ?  Infinity : parseFloat(hiStr);
+  if (isFinite(lo) && isFinite(hi) && lo > hi) { var tmp = lo; lo = hi; hi = tmp; }
+  if (!isFinite(lo) && !isFinite(hi)) {
+    Reactable.setFilter(tableId, columnId, undefined);
+  } else {
+    Reactable.setFilter(tableId, columnId, [lo, hi]);
+  }
+}
+'))
+
+# Filter method: row value must be in the ticked set.
+check_filter <- JS("function(rows, columnId, filterValue) {
+  if (!filterValue || filterValue.length === 0) return rows;
+  return rows.filter(function(row) {
+    return filterValue.indexOf(String(row.values[columnId])) !== -1;
+  });
+}")
+
+# Filter method: row value must fall within [lo, hi].
+range_filter <- JS("function(rows, columnId, filterValue) {
+  if (!filterValue) return rows;
+  return rows.filter(function(row) {
+    var v = parseFloat(row.values[columnId]);
+    return !isNaN(v) && v >= filterValue[0] && v <= filterValue[1];
+  });
+}")
+
+# Scrollable checkbox list for categorical columns.
+# Respects factor level ordering where available.
+checkbox_input <- function(values, name) {
+  opts <- if (is.factor(values)) {
+    levels(values)[levels(values) %in% as.character(values)]
+  } else {
+    sort(unique(as.character(values[!is.na(values)])))
+  }
+  cid <- paste0("chk-", name)
+  div(
+    id    = cid,
+    style = "max-height:100px; overflow-y:auto; padding:1px 0;",
+    lapply(opts, function(v) {
+      tags$label(
+        style = "display:block; white-space:nowrap; font-size:0.78rem; cursor:pointer;",
+        tags$input(
+          type     = "checkbox",
+          value    = v,
+          style    = "margin-right:4px; vertical-align:middle;",
+          onchange = sprintf("updateCheckFilter('results-tbl','%s','%s')", name, cid)
+        ),
+        v
+      )
+    })
+  )
+}
+
+# Dual Min / Max numeric entry boxes for numeric columns.
+range_input <- function(values, name, digits = 0) {
+  vals <- suppressWarnings(as.numeric(values))
+  lo   <- floor(min(vals, na.rm = TRUE))
+  hi   <- ceiling(max(vals, na.rm = TRUE))
+  step <- if (digits > 0) 10^(-digits) else 1
+  cid  <- paste0("rng-", name)
+  inp_style <- "width:100%; font-size:0.78rem; padding:1px 3px; box-sizing:border-box;"
+  div(
+    id    = cid,
+    style = "padding:2px 0; font-size:0.78rem; color:#555; line-height:1.6;",
+    "Min",
+    tags$input(
+      type        = "number", class = "rng-lo",
+      placeholder = lo, min = lo, max = hi, step = step,
+      style    = inp_style,
+      onchange = sprintf("updateRangeFilter('results-tbl','%s','%s')", name, cid)
+    ),
+    "Max",
+    tags$input(
+      type        = "number", class = "rng-hi",
+      placeholder = hi, min = lo, max = hi, step = step,
+      style    = inp_style,
+      onchange = sprintf("updateRangeFilter('results-tbl','%s','%s')", name, cid)
+    )
+  )
+}
+
+tbl <- reactable(
+  tbl_data,
+  elementId       = "results-tbl",
+  filterable      = TRUE,
+  searchable      = TRUE,
+  defaultPageSize = 10,
+  pageSizeOptions = c(10, 25, 50, 100),
+  highlight       = TRUE,
+  compact         = TRUE,
+  style           = list(fontSize = "0.85rem"),
+  rowStyle = function(index) {
+    v <- as.character(tbl_data$variable[index])
+    list(background = variable_colors[[v]])
+  },
+  columns = list(
+    sensor = colDef(
+      sticky = "left", minWidth = 80,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    correction = colDef(
+      name = "corr.", sticky = "left", minWidth = 65,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    processing = colDef(
+      name = "proc.", sticky = "left", minWidth = 65,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    zone = colDef(
+      minWidth = 75,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    source = colDef(
+      minWidth = 70,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    site         = colDef(minWidth = 130),
+    season = colDef(
+      minWidth = 80,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    variable = colDef(
+      minWidth = 75,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    variable_sat = colDef(
+      name = "var (sat)", minWidth = 85,
+      filterMethod = check_filter, filterInput = checkbox_input
+    ),
+    n = colDef(
+      minWidth     = 60,
+      format       = colFormat(separators = TRUE, digits = 0),
+      filterMethod = range_filter,
+      filterInput  = function(values, name) range_input(values, name, digits = 0)
+    ),
+    Bias = colDef(
+      minWidth     = 65,
+      format       = colFormat(digits = 0),
+      filterMethod = range_filter,
+      filterInput  = function(values, name) range_input(values, name, digits = 0)
+    ),
+    Error = colDef(
+      minWidth     = 65,
+      format       = colFormat(digits = 0),
+      filterMethod = range_filter,
+      filterInput  = function(values, name) range_input(values, name, digits = 0)
+    ),
+    Slope = colDef(
+      minWidth     = 65,
+      format       = colFormat(digits = 2),
+      filterMethod = range_filter,
+      filterInput  = function(values, name) range_input(values, name, digits = 2)
+    ),
+    Slope_log = colDef(
+      minWidth     = 70,
+      format       = colFormat(digits = 2),
+      filterMethod = range_filter,
+      filterInput  = function(values, name) range_input(values, name, digits = 2)
+    )
+  )
+)
+
+tagList(dl_row, tbl, tbl_js)
 ```
